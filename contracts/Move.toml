@@ -3,7 +3,7 @@ name = "mcpx"
 version = "0.1.0"
 edition = "2024.beta"
 authors = ["mcpxgg contributors"]
-license = "MIT"
+license = "Apache-2.0"
 published-at = "0x0"
 
 [dependencies]
@@ -14,3 +14,5 @@ mcpx = "0x0"
 
 [dev-addresses]
 mcpx = "0x0"
+
+[dev-dependencies]

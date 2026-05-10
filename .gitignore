@@ -44,3 +44,11 @@ coverage/
 # Sui
 sui.keystore
 *.move.lock
+
+# Move test artifacts
+contracts/.coverage_map.mvcov
+contracts/traces/
+.coverage_map.mvcov
+
+# Claude scratch state
+.claude/

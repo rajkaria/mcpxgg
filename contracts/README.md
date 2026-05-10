@@ -1,63 +1,82 @@
 # MCPX Move Package
 
-The on-chain settlement layer for mcpxgg. **Sprint 0** stub. **Sprint 1** fills in the 13 modules.
+Sui-native contracts powering the mcpxgg marketplace. 13 modules implement
+the publish → session → settle → claim flow with on-chain take-rate
+configuration, SLA staking (stub today, S7), spending intents (stub today,
+S6), and composable bundles (stub today, S5).
 
-See `docs/SPRINTS.md` Sprint 1 for the module-by-module build plan.
+## Modules
 
-## Build
+| Module | Purpose | Status |
+|---|---|---|
+| `events` | All event types + `public(package)` emit helpers | ✓ S1 |
+| `admin` | `PlatformConfig` (take_rate_bps, insurance_bps, subsidy, paused) + `AdminCap` | ✓ S1 |
+| `treasury` | `PlatformTreasury<T>` — collects 200 bps of every settled call | ✓ S1 |
+| `insurance` | `InsurancePool<T>` — collects 50 bps; pays out via `InsurancePayerCap` | ✓ S1 |
+| `vault` | `DeveloperVault<T>` — accrues 9750 bps to dev; owner-gated `claim` | ✓ S1 |
+| `registry` | `Server`, `Tool`, `ServerOwnerCap`, `NamespaceRegistry` | ✓ S1 |
+| `session` | `Session<T>`, `SessionKey` — pre-funded escrow with caps + scope | ✓ S1 |
+| `settlement` | `CallReceipt` + atomic `settle_call` PTB | ✓ S1 |
+| `quality` | `QualityAttestation` + `OracleCap` for off-chain quality oracle | ✓ S1 |
+| `access` | `ScopedKey` — API key derivation stub | ◐ S1 stub → S4 wired |
+| `intent` | `SpendingIntent` — agent budget delegation stub | ◐ S1 stub → S6 wired |
+| `staking` | `ServerStake<T>` + slash-to-insurance flow | ◐ S1 stub → S7 wired |
+| `bundle` | `Bundle` — curated server group with price multiplier | ◐ S1 stub → S5 wired |
 
-```bash
-cd contracts
-sui move build
+## The atomic PTB
+
+Every settled call goes through `settlement::settle_call<T>` in a single
+transaction:
+
+```
+debit session  → split take rate
+              ├─ 50 bps  → insurance::collect
+              ├─ 200 bps → treasury::collect
+              └─ 9750 bps → vault::accrue
+              ↓
+              mint CallReceipt (soulbound to payer)
+              ↓
+              emit CallSettled
 ```
 
-## Test
+Any failed step reverts the whole PTB — no one is paid, no receipt is minted.
 
-```bash
-sui move test
+## Build / test
+
+```sh
+sui move build              # all 13 modules
+sui move test               # full suite (65 tests as of S1)
+sui move test --coverage    # +coverage report
+sui move coverage summary   # coverage breakdown by module
 ```
 
-## Deploy (testnet, Sprint 1)
+`scripts/run-move-tests.sh` runs build + test + coverage in one go (used by CI).
 
-```bash
+## Deploy
+
+```sh
 sui client switch --env testnet
-bash scripts/deploy-testnet.sh
+./scripts/deploy-testnet.sh \
+  --coin-type 0x2::sui::SUI                # placeholder; swap for USDsui type tag
 ```
 
-## Deploy (mainnet, Sprint 5)
+The script:
+1. `sui move build`
+2. `sui client publish` → captures package id
+3. Initializes `PlatformTreasury<T>` and `InsurancePool<T>` for the chosen coin
+4. Prints a copy-paste `.env` block with package id, registry id, treasury id,
+   insurance id, config id, admin cap id
 
-```bash
-# Multisig-gated; see scripts/deploy-mainnet.sh
-```
+`PlatformConfig`, `NamespaceRegistry`, and `AdminCap` are created automatically
+by each module's `init` at publish time.
 
-## Modules (Sprint 1 target)
+## Sprint 1 checklist
 
-| Module | Purpose |
-|---|---|
-| `mcpx::registry` | Server objects + tool metadata + namespace uniqueness |
-| `mcpx::session` | User USDsui balance + spending policies |
-| `mcpx::settlement` | Atomic single-PTB settlement (debit, split, mint receipt) |
-| `mcpx::vault` | Developer earnings vaults |
-| `mcpx::treasury` | Platform fee collection |
-| `mcpx::insurance` | InsurancePool — 0.5% take + slashed stakes |
-| `mcpx::access` | ScopedKey for per-server / org / member permissions |
-| `mcpx::intent` | SpendingIntent — agent budget delegation (Sprint 6) |
-| `mcpx::staking` | ServerStake + auto-slash (Sprint 7) |
-| `mcpx::bundle` | Composable Bundle (Sprint 5) |
-| `mcpx::quality` | QualityAttestation from oracle |
-| `mcpx::events` | All event types for indexer |
-| `mcpx::admin` | UpgradeCap + PlatformConfig |
-
-## Configuration parameters (`PlatformConfig` shared object)
-
-| Param | Default | Mutable by | Sprint |
-|---|---|---|---|
-| `take_rate_bps` | 250 (2.5%) | Admin multisig | S1 |
-| `insurance_bps` | 50 (0.5% of take) | Admin multisig | S1 |
-| `bootstrap_subsidy_atomic` | 1_000_000 (1.00 USDsui) | Admin multisig | S4 |
-| `subsidy_monthly_budget_atomic` | 500_000_000_000 | Admin multisig | S4 |
-| `min_sla_stake_atomic` | 10_000_000 (10 USDsui) | Admin multisig | S7 |
-
-## License
-
-The Move package itself is not yet open-source. The accompanying SDKs and facilitator are Apache 2.0 (see ADR-006).
+- [x] `Move.toml` with framework dep
+- [x] All 13 modules build clean
+- [x] 65 Move tests, 77.54% line coverage (admin/vault/treasury 100%, registry 90%, settlement 82%)
+- [x] E2E test: publish → session → 3× settle → claim → close
+- [x] Deploy script
+- [x] Schema migration 006 (Postgres mirror columns)
+- [x] TS types + validation schema with `priceAtomic: bigint`
+- [ ] First testnet deploy (S1-T17 — needs Sui keystore + testnet SUI)
