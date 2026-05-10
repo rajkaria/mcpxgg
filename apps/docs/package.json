@@ -1,0 +1,12 @@
+{
+  "name": "@mcpxgg/docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public documentation site. Sprint 8 fleshes this out.",
+  "scripts": {
+    "dev": "echo 'docs: scaffold only, see docs/SPRINTS.md Sprint 8'",
+    "build": "echo 'docs: build wired in Sprint 8'",
+    "lint": "echo 'docs: lint wired in Sprint 8'",
+    "typecheck": "echo 'docs: typecheck wired in Sprint 8'"
+  }
+}

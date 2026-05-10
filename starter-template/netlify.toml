@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "dist/src/adapters"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Rewrite /mcp to the Netlify Function
+[[redirects]]
+  from = "/mcp"
+  to = "/.netlify/functions/netlify"
+  status = 200
+
+# CORS headers for the MCP endpoint
+[[headers]]
+  for = "/mcp"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"

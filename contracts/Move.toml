@@ -1,0 +1,16 @@
+[package]
+name = "mcpx"
+version = "0.1.0"
+edition = "2024.beta"
+authors = ["mcpxgg contributors"]
+license = "MIT"
+published-at = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+mcpx = "0x0"
+
+[dev-addresses]
+mcpx = "0x0"

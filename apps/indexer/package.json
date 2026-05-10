@@ -1,0 +1,21 @@
+{
+  "name": "@mcpxgg/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sui events → Postgres mirror service. Sprint 2 wires this.",
+  "scripts": {
+    "dev": "echo 'indexer: scaffold only, see docs/SPRINTS.md Sprint 2'",
+    "build": "echo 'indexer: build wired in Sprint 2'",
+    "lint": "echo 'indexer: lint wired in Sprint 2'",
+    "typecheck": "echo 'indexer: typecheck wired in Sprint 2'",
+    "test": "echo 'indexer: tests added in Sprint 2'"
+  },
+  "dependencies": {
+    "@mcpxgg/chain": "workspace:*",
+    "@mcpxgg/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^22"
+  }
+}

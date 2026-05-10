@@ -1,0 +1,22 @@
+{
+  "name": "@mcpxgg/facilitator",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Sui x402 facilitator — open-source canonical implementation. Sprint 2 wires this.",
+  "scripts": {
+    "dev": "echo 'facilitator: scaffold only, see docs/SPRINTS.md Sprint 2'",
+    "build": "echo 'facilitator: build wired in Sprint 2'",
+    "lint": "echo 'facilitator: lint wired in Sprint 2'",
+    "typecheck": "echo 'facilitator: typecheck wired in Sprint 2'",
+    "test": "echo 'facilitator: tests added in Sprint 2'"
+  },
+  "dependencies": {
+    "@mcpxgg/chain": "workspace:*",
+    "@mcpxgg/x402": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^22"
+  }
+}
