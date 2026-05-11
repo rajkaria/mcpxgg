@@ -140,6 +140,13 @@
 Test stats: 65 Move tests + 16 TS validation tests = 81 passing. Move coverage 77.54%
 (admin/vault/treasury 100%, registry 90%, settlement 82%; stubs lower as expected).
 
+**Sprint 2 status (2026-05-11).** All code-side tasks ✓. Outstanding: live-credential
+deploys S2-T10 (facilitator → Fly.io), S2-T11 (DNS for `facilitator.mcpx.gg`),
+S2-T21 (indexer → Fly.io), and the testnet-bound E2E tests S2-T22/T23 (which need
+S1-T17 testnet deploy first). Test stats: 128 TS tests (29 x402 + 44 facilitator
++ 39 indexer + 16 shared) + 65 Move = **193 passing**. Turbo typecheck green
+across all 14 packages.
+
 **Definition of Done.**
 - `sui move build` clean for all 13 modules
 - All Move tests pass
@@ -169,30 +176,30 @@ Test stats: 65 Move tests + 16 TS validation tests = 81 passing. Move coverage 7
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S2-T01 | `apps/facilitator/package.json`, hono-based HTTP server, base structure | apps/facilitator | M | ☐ |
-| S2-T02 | x402 spec types in `packages/x402/src/types.ts` (PaymentPayload, PaymentDetails, VerifyResult, SettleResult) | packages/x402 | S | ☐ |
-| S2-T03 | Facilitator `/supported` endpoint — returns schemes `['exact','upto']` networks `['sui-testnet','sui-mainnet']` | apps/facilitator | S | ☐ |
-| S2-T04 | Facilitator `/verify` — validates payment payload signature; checks session balance, spending policies via Sui RPC | apps/facilitator | L | ☐ |
-| S2-T05 | Facilitator `/settle` (exact scheme) — builds PTB calling `mcpx::settlement::settle_call`; signs as gas station; submits; awaits finality | apps/facilitator | XL | ☐ |
-| S2-T06 | Sponsored gas station: facilitator key holds SUI for gas; tracks spending; configurable rate-limits | apps/facilitator | M | ☐ |
-| S2-T07 | Apache 2.0 LICENSE file in `apps/facilitator/` | apps/facilitator | S | ☐ |
-| S2-T08 | Facilitator README explaining x402 compliance + self-host instructions | apps/facilitator | M | ☐ |
-| S2-T09 | Facilitator unit tests (verify validation cases + settle dry-run cases) | apps/facilitator | M | ☐ |
+| S2-T01 | `apps/facilitator/package.json`, hono-based HTTP server, base structure | apps/facilitator | M | ✓ |
+| S2-T02 | x402 spec types in `packages/x402/src/types.ts` (PaymentPayload, PaymentDetails, VerifyResult, SettleResult) | packages/x402 | S | ✓ |
+| S2-T03 | Facilitator `/supported` endpoint — returns schemes `['exact','upto']` networks `['sui-testnet','sui-mainnet']` | apps/facilitator | S | ✓ |
+| S2-T04 | Facilitator `/verify` — validates payment payload signature; checks session balance, spending policies via Sui RPC | apps/facilitator | L | ✓ |
+| S2-T05 | Facilitator `/settle` (exact scheme) — builds PTB calling `mcpx::settlement::settle_call`; signs as gas station; submits; awaits finality | apps/facilitator | XL | ✓ |
+| S2-T06 | Sponsored gas station: facilitator key holds SUI for gas; tracks spending; configurable rate-limits | apps/facilitator | M | ✓ |
+| S2-T07 | Apache 2.0 LICENSE file in `apps/facilitator/` | apps/facilitator | S | ✓ |
+| S2-T08 | Facilitator README explaining x402 compliance + self-host instructions | apps/facilitator | M | ✓ |
+| S2-T09 | Facilitator unit tests (verify validation cases + settle dry-run cases) | apps/facilitator | M | ✓ |
 | S2-T10 | Facilitator deploy to Fly.io with mlocked private key + multi-region | apps/facilitator | M | ☐ |
 | S2-T11 | DNS: `facilitator.mcpx.gg` → Fly.io | hosting | S | ☐ |
-| S2-T12 | `apps/indexer/package.json`, base subscriber using `@mysten/sui` event API | apps/indexer | M | ☐ |
-| S2-T13 | Indexer event handlers: ServerPublished, ServerUpdated, ServerDeactivated → upsert `mcp_servers` | apps/indexer | M | ☐ |
-| S2-T14 | Indexer event handlers: SessionCreated, SessionDeposit, SessionWithdraw → upsert `chain_balances` | apps/indexer | M | ☐ |
-| S2-T15 | Indexer event handler: CallSettled → INSERT `request_log` (with tx_digest + receipt_blob_id) | apps/indexer | M | ☐ |
-| S2-T16 | Indexer event handler: VaultClaimed → upsert `developer_vaults` lifetime totals | apps/indexer | M | ☐ |
-| S2-T17 | Indexer checkpoint tracking: `last_processed_checkpoint` persisted to Postgres; replay-safe on restart | apps/indexer | M | ☐ |
-| S2-T18 | Indexer dedup: PRIMARY KEY on `(tx_digest, event_seq)` for idempotent upserts | apps/indexer | S | ☐ |
-| S2-T19 | Migration `007_indexer_views.sql`: materialized views `marketplace_servers`, `dashboard_usage`, `live_feed_24h` | supabase | M | ☐ |
-| S2-T20 | Indexer Redis pub/sub: publishes `event:CallSettled` with payload for /live | apps/indexer | M | ☐ |
+| S2-T12 | `apps/indexer/package.json`, base subscriber using `@mysten/sui` event API | apps/indexer | M | ✓ |
+| S2-T13 | Indexer event handlers: ServerPublished, ServerUpdated, ServerDeactivated → upsert `mcp_servers` | apps/indexer | M | ✓ |
+| S2-T14 | Indexer event handlers: SessionCreated, SessionDeposit, SessionWithdraw → upsert `chain_balances` | apps/indexer | M | ✓ |
+| S2-T15 | Indexer event handler: CallSettled → INSERT `request_log` (with tx_digest + receipt_blob_id) | apps/indexer | M | ✓ |
+| S2-T16 | Indexer event handler: VaultClaimed → upsert `developer_vaults` lifetime totals | apps/indexer | M | ✓ |
+| S2-T17 | Indexer checkpoint tracking: `last_processed_checkpoint` persisted to Postgres; replay-safe on restart | apps/indexer | M | ✓ |
+| S2-T18 | Indexer dedup: PRIMARY KEY on `(tx_digest, event_seq)` for idempotent upserts | apps/indexer | S | ✓ |
+| S2-T19 | Migration `007_indexer_views.sql`: materialized views `marketplace_servers`, `dashboard_usage`, `live_feed_24h` | supabase | M | ✓ |
+| S2-T20 | Indexer Redis pub/sub: publishes `event:CallSettled` with payload for /live | apps/indexer | M | ✓ |
 | S2-T21 | Indexer deploy to Fly.io (single active instance, passive standby) | apps/indexer | M | ☐ |
 | S2-T22 | E2E test: publish server via raw Move call → wait 5s → query `marketplace_servers` view → row exists | tests | M | ☐ |
 | S2-T23 | E2E test: settle a call via facilitator → wait 5s → query `dashboard_usage` → row exists with tx_digest | tests | M | ☐ |
-| S2-T24 | Facilitator + indexer integration in Turbo: `pnpm dev` starts both alongside web | repo | S | ☐ |
+| S2-T24 | Facilitator + indexer integration in Turbo: `pnpm dev` starts both alongside web | repo | S | ✓ |
 
 **Definition of Done.**
 - Facilitator deployed at facilitator.mcpx.gg, returning correct `/supported`, validating real payments, settling real calls on testnet
@@ -505,6 +512,12 @@ Test stats: 65 Move tests + 16 TS validation tests = 81 passing. Move coverage 7
 | S8-T12 | First blog post on `apps/docs/blog/`: "MCPX is mainnet on Sui" | content | M | ☐ |
 | S8-T13 | Submission checklist (per hackathon handbook) — see SPRINTS appendix | submission | M | ☐ |
 | S8-T14 | **Demo Day live performance** | demo | — | ☐ |
+| **Docs + Landing refactor (post-feature-freeze)** | | | | |
+| S8-T15 | `apps/docs/` site stand-up at `docs.mcpx.gg` (Fumadocs or Nextra). Sections: Home, Quickstart (5-min user, 5-min developer), Core concepts (Sessions, Vaults, Receipts, Intents, Bundles, Insurance), SDK refs (`@mcpxgg/sdk-client`, `@mcpxgg/sdk-server`, `@mcpxgg/widget`), x402 facilitator spec, Move package reference, Recipes (build an agent, embed a tool, run your own marketplace) | apps/docs | XL | ☐ |
+| S8-T16 | Landing page refactor (`apps/web/app/page.tsx` + `/about`, `/pricing`, `/developers`): hero rebuilt around "on-chain MCP marketplace settled in USDsui", live cumulative-settled ticker, "Powered by Sui + x402" trust strip, 5 anchor server cards, Insurance Pool transparency box, CTAs split for end-users vs developers, dark-mode polish, OG/Twitter cards with live numbers, animated stable-coin flow diagram | apps/web | L | ☐ |
+| S8-T17 | Marketing pages refresh: `/about` (mission, no credits/subscriptions, x402 differentiator), `/pricing` (USDsui, take-rate breakdown 50bps insurance + 200bps treasury), `/developers` (revenue calculator, vault auto-claim, SLA staking, payout chain selector preview), `/security` (Move modules, audit status, multisig admin) | apps/web | M | ☐ |
+| S8-T18 | Lighthouse 95+ on Performance, Accessibility, SEO, Best Practices for `/`, `/marketplace`, `/dashboard`, `/receipts/[id]` | apps/web | M | ☐ |
+| S8-T19 | Docs + landing E2E smoke: cold visitor → reads quickstart → recharges $1 → calls walrus-search → sees receipt | tests | M | ☐ |
 
 **Definition of Done.**
 - Audit submitted; critical findings (if any) patched

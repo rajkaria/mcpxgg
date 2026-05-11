@@ -3,20 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Sui x402 facilitator — open-source canonical implementation. Sprint 2 wires this.",
+  "description": "Sui x402 facilitator — open-source canonical implementation.",
+  "type": "module",
+  "main": "./src/index.ts",
   "scripts": {
-    "dev": "echo 'facilitator: scaffold only, see docs/SPRINTS.md Sprint 2'",
-    "build": "echo 'facilitator: build wired in Sprint 2'",
-    "lint": "echo 'facilitator: lint wired in Sprint 2'",
-    "typecheck": "echo 'facilitator: typecheck wired in Sprint 2'",
-    "test": "echo 'facilitator: tests added in Sprint 2'"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'facilitator: lint placeholder'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.0",
     "@mcpxgg/chain": "workspace:*",
-    "@mcpxgg/x402": "workspace:*"
+    "@mcpxgg/x402": "workspace:*",
+    "@mysten/sui": "^1.20.0",
+    "hono": "^4.6.0",
+    "pino": "^9.5.0"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^22"
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }

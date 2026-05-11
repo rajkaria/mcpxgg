@@ -8,6 +8,8 @@ build/
 .next/
 .turbo/
 *.tsbuildinfo
+# Next.js auto-generated, per-app
+apps/*/next-env.d.ts
 
 # Move build output
 contracts/build/

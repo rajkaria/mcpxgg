@@ -1,43 +1,43 @@
 /**
  * @mcpxgg/x402 — x402 spec types and Sui scheme client.
  *
- * Wired in Sprint 2.
+ * Sprint 2 (S2-T02): types, wire codecs, and FacilitatorClient.
+ * Sprint 7 (S7-T01): `upto` scheme + streaming refund flow.
  */
 
-export const X402_VERSION = '0.1.0';
+export {
+  X402_VERSION,
+  ALL_SCHEMES,
+  ALL_NETWORKS,
+  type Scheme,
+  type Network,
+  type PaymentDetails,
+  type PaymentDetailsWire,
+  type PaymentPayload,
+  type PaymentPayloadWire,
+  type VerifyResult,
+  type VerifyInvalidReason,
+  type SettleResult,
+  type SettleResultWire,
+  type SettleErrorCode,
+  type SupportedResult,
+} from './types.js';
 
-export type Scheme = 'exact' | 'upto';
+export {
+  bigintFromAtomicString,
+  atomicStringFromBigint,
+  detailsToWire,
+  detailsFromWire,
+  payloadToWire,
+  payloadFromWire,
+  settleResultToWire,
+  settleResultFromWire,
+  parsePaymentPayloadWire,
+  parsePaymentDetailsWire,
+} from './wire.js';
 
-export interface PaymentDetails {
-  scheme: Scheme;
-  network: string; // 'sui-mainnet' | 'sui-testnet' | future: 'base-mainnet', 'solana-mainnet'
-  receiver: string; // server's address or session's address depending on flow
-  amountAtomic: bigint;
-  tokenType: string;
-  validUntilMs: number;
-  metadata?: Record<string, unknown>;
-}
-
-export interface PaymentPayload {
-  signature: string;
-  payerAddress: string;
-  sessionObjectId?: string;
-  intentId?: string;
-  details: PaymentDetails;
-}
-
-export interface VerifyResult {
-  isValid: boolean;
-  invalidReason?: string;
-}
-
-export interface SettleResult {
-  success: boolean;
-  txDigest?: string;
-  errorMessage?: string;
-}
-
-export interface SupportedResult {
-  schemes: Scheme[];
-  networks: string[];
-}
+export {
+  FacilitatorClient,
+  FacilitatorHttpError,
+  type FacilitatorClientOptions,
+} from './client.js';
