@@ -63,3 +63,43 @@ Mainnet by **June 21, 2026** (hackathon target). Demo Day **July 20–21, 2026**
 ## Don't be precious — but don't be sloppy either
 
 This is a real product, not a hackathon throwaway. Tests for every Move module. E2E test for every user flow. Every PR ships green CI. But also: don't bikeshed; ship the simplest thing that meets the DoD, optimize when measured.
+
+---
+
+## Session Context (Last updated: 2026-05-17 18:41)
+
+### Current State
+- **Sprints 0–6 complete and on `origin/main`.** Remote `main` = `7c003f8` (S6). GitHub repo live: https://github.com/rajkaria/mcpxgg
+- Verification all green: `sui move test` **77/77**, `pnpm turbo run typecheck` exit 0, `pnpm turbo run test` **24/24 tasks**, `pnpm --filter @mcpxgg/web build` ✓.
+- **Sprint 6 shipped 24/24 code tasks.** Spending Intents (contract→indexer→gateway→SDK→UI), quality oracle service, anchor servers #4 (`walrus-store`) & #5 (`sui-identity`), Bloomberg `/live` page, abuse detection, demo-call, low-balance alert, revenue calculator, featured-rotation admin.
+- **Only S6-T10 / S6-T13 remain** (mainnet deploy of the 2 new anchor servers) — blocked on mainnet keystore (see `docs/BLOCKED.md` item 11). Code/Docker/fly are deploy-ready.
+- ⚠️ **Local `main` (primary worktree `/Users/rajkaria/Projects/mcpxgg`) is still at S5 (`32db015`)** — remote is ahead. Run `git pull --ff-only` there to sync (clean fast-forward, no conflicts). This worktree's branch `claude/gracious-poincare-09ddde` is pushed.
+
+### Recent Changes (Sprint 6, commit 7c003f8 — 112 files)
+- **Contracts:** `intent.move` gained `per_call_cap_atomic` + `allowed_categories`; `settlement.move` added `settle_call_with_intent<T>` via shared private `settle_inner<T>` (zero dup, `settle_call` unchanged signature); `events.move` `IntentCreated` now carries `per_call_cap_atomic`. New `contracts/tests/intent_tests.move` + extended `settlement_tests.move`/`stubs_tests.move`.
+- **Indexer:** `handlers/intent.ts` + storage persist per-call cap; new `apps/indexer/src/abuse.ts` (3σ flagging) + test; `runner.ts` periodic abuse hook; `pubsub.ts` LPUSHes capped `mcpx:live:log` for SSE.
+- **New `apps/quality-oracle/`** package: UTC-anchored 6h windows, score = `0.5·uptime + 0.3·(1−err) + 0.2·latency_score` (latency_score = clamp(1−p95/2000,0,1)); signs `mcpx::quality::attest` via `@mcpxgg/chain` only. 17 tests.
+- **New servers:** `servers/walrus-store/` (tools upload/retrieve/metadata/list, 13 tests) + `servers/sui-identity/` (resolve_address/resolve_name/verify_zklogin/address_reputation, 17 tests). Both offline-by-default, Docker+fly deploy-ready.
+- **Web (apps/web):** `app/dashboard/intents/` + `components/IntentManager.tsx`; `app/live/` (`live-terminal.tsx`, `opengraph-image.tsx`, `api/live/stream` SSE, `api/live/metrics`); `components/QualityBadge.tsx`; `components/DemoCallButton.tsx` + `api/demo-call`; `components/LowBalanceBanner.tsx` + `api/alerts/low-balance`; `components/RevenueCalculator.tsx`; `app/dashboard/admin/featured/` + `api/admin/featured` + `lib/auth/admin.ts`.
+- **SDK/gateway/facilitator:** `@mcpxgg/sdk` `callTool(name,args,{intentId,category})` + `X-Mcpx-Intent-Id`/`X-Mcpx-Category` headers; new `apps/gateway/src/intent.ts` (8 `intent_*` error codes) → facilitator builds `settle_call_with_intent` PTB. `apps/docs/content/building-an-autonomous-agent.md`.
+- **Migrations:** `010_quality_attestations.sql`, `011_intents_staking.sql` (intents per-call/category cols + `server_stakes` for S7 + `abuse_flags`), `012_featured_rotation.sql` (app-owned, NOT mirror), `013_intents_gateway_read.sql` (read view).
+- **`packages/chain`:** `buildCreateIntentTx`/`buildRevokeIntentTx`/`buildAttestQualityTx` tx-builders + `addressFromPrivateKey` signer helper.
+- **`packages/shared`:** new DB row types + exports; new `economics.ts` (take-rate constants, ADR-004).
+- **Pre-existing bug fixes (boil-the-ocean):** `packages/walrus/src/*.ts` relative imports made extensionless (was `.js`-specifier, broke Turbopack — now matches monorepo `moduleResolution: Bundler` convention); `apps/web/lib/supabase/client.ts` env fallbacks so static prerender doesn't crash without secrets; `apps/web/next.config.ts` added `transpilePackages`.
+
+### Next Steps
+1. **Sprint 7** (`docs/SPRINTS.md` line ~495, "Streaming + SLA Staking + Insurance + Widgets", June 29–July 12, 2 weeks). Read the S7 sub-task table before starting. Note S7 risk: x402 `upto` spec ambiguity — coordinate with x402 Foundation by S6 end.
+2. Sync local `main` in the primary worktree (`git pull --ff-only`).
+3. S6-T10/T13 stay blocked until Raj does the mainnet keystore (BLOCKED.md item 11). Don't retry — it's not code.
+4. The single highest-leverage unblock remains **BLOCKED.md item 1 (Sui keystore + testnet deploy)** and **item 2 is now DONE (GitHub repo exists)**. CI workflow will run on the next push — check it.
+
+### Key Decisions
+- **Contracts as dependency root:** landed `contracts` agent foreground first, then 4 parallel implementation agents (indexer, servers, web, sdk/gateway) briefed with the finalized contract signatures + event field list — avoids cross-agent event-shape races.
+- **Migration numbering:** S6 SPRINTS text said `008_/009_` but those were already taken (users_sui/bundles); used `010–013`. SPRINTS task text corrected to real filenames.
+- **walrus `.js` fix = root cause, not config band-aid:** made walrus imports extensionless to match every other monorepo package (shared/chain) under `moduleResolution: Bundler` + Turbopack, rather than fighting webpack/Turbopack extensionAlias config.
+- **Supabase client env fallback:** browser client only truly runs client-side (Next inlines public env there); placeholder fallbacks just keep build-time static prerender from throwing — lets CI build with zero secrets.
+- **Merge via `git push origin HEAD:main`:** local `main` is checked out in the primary worktree so couldn't `checkout main` here; pushed HEAD directly (clean fast-forward).
+- **Quality score weighting locked:** availability dominates (0.5 uptime), correctness next (0.3), latency tiebreaker (0.2). Zero-call servers not attested. Deterministic UTC-anchored windows to avoid oracle drift.
+
+### Previous Session Notes
+- **S1 (2026-05-10):** 13 Move modules + atomic settlement + chain mirror schema + 65 Move tests + TS validation. (Pre-S6 history: S0 scaffold → S1 contracts → S2 facilitator+indexer → S3 chain gateway+server SDK → S4 Privy+chain+marketplace → S5 anchors #2/#3+CLI+bundles.)
