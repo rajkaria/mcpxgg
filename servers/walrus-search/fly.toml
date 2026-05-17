@@ -1,0 +1,28 @@
+# Fly.io app for the walrus-search anchor server (S3-T16).
+# Optional secrets: OPENAI_API_KEY (upgrades embeddings), WALRUS_PUBLISHER_URL,
+# WALRUS_AGGREGATOR_URL (durable corpus archival). Defaults are hermetic.
+app = "mcpxgg-walrus-search"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3010"
+
+[http_service]
+  internal_port = 3010
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "15s"
+  timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

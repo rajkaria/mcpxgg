@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'x402: lint placeholder'",
-    "test": "node --import tsx --test",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

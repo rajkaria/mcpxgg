@@ -229,24 +229,40 @@ across all 14 packages.
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S3-T01 | `apps/gateway` standalone hono app; lift handler/router/executor from copied `lib/gateway/*` | apps/gateway | M | ☐ |
-| S3-T02 | Gateway auth: API key lookup → Redis cache → Postgres fallback; returns `{user_id, session_id, scoped_servers, balance_atomic}` | apps/gateway | M | ☐ |
-| S3-T03 | Gateway pre-flight checks: session balance, spending policies (per-call cap, per-day cap), scoped key allowed servers | apps/gateway | M | ☐ |
-| S3-T04 | Gateway calls facilitator `/settle` after server response; non-blocking option via flag | apps/gateway | M | ☐ |
-| S3-T05 | Walrus blob upload of request/response (parallel with settlement); blob_id returned in receipt | apps/gateway | M | ☐ |
-| S3-T06 | Gateway `_meta.receipt` injection: tx_digest, blob_id, amount, chain, "Powered by mcpxgg" | apps/gateway | S | ☐ |
-| S3-T07 | Gateway error handling: server error → no settle; settle failure after server success → log + best-effort retry | apps/gateway | M | ☐ |
-| S3-T08 | Gateway tests: unit (handler dispatch), integration (real testnet, live facilitator) | apps/gateway | L | ☐ |
+| S3-T01 | `apps/gateway` standalone hono app; lift handler/router/executor from copied `lib/gateway/*` | apps/gateway | M | ✓ |
+| S3-T02 | Gateway auth: API key lookup → Redis cache → Postgres fallback; returns `{user_id, session_id, scoped_servers, balance_atomic}` | apps/gateway | M | ✓ |
+| S3-T03 | Gateway pre-flight checks: session balance, spending policies (per-call cap, per-day cap), scoped key allowed servers | apps/gateway | M | ✓ |
+| S3-T04 | Gateway calls facilitator `/settle` after server response; non-blocking option via flag | apps/gateway | M | ✓ |
+| S3-T05 | Walrus blob upload of request/response (parallel with settlement); blob_id returned in receipt | apps/gateway | M | ✓ |
+| S3-T06 | Gateway `_meta.receipt` injection: tx_digest, blob_id, amount, chain, "Powered by mcpxgg" | apps/gateway | S | ✓ |
+| S3-T07 | Gateway error handling: server error → no settle; settle failure after server success → log + best-effort retry | apps/gateway | M | ✓ |
+| S3-T08 | Gateway tests: unit (handler dispatch), integration (real testnet, live facilitator) | apps/gateway | L | ✓ |
 | S3-T09 | Gateway deploy to Fly.io at `mcp.mcpx.gg`; env wired | apps/gateway | M | ☐ |
 | S3-T10 | DNS: `mcp.mcpx.gg` → Fly.io | hosting | S | ☐ |
-| S3-T11 | Update `apps/web/app/api/mcp` route to forward to `mcp.mcpx.gg` for backward compat (or remove if direct deploy works) | apps/web | S | ☐ |
-| S3-T12 | `servers/walrus-search/` package: hono server using `@mcpxgg/server` SDK (skeleton even if SDK is mostly stubbed) | servers/walrus-search | L | ☐ |
-| S3-T13 | walrus-search tools: `index`, `query`, `delete_index` per spec §10.1 | servers/walrus-search | XL | ☐ |
-| S3-T14 | walrus-search infra: vector store (Pinecone or Qdrant); embeddings via OpenAI/Voyage | servers/walrus-search | L | ☐ |
-| S3-T15 | walrus-search published to testnet via raw Move call (CLI exists yet — use raw `sui client` for now) | servers/walrus-search | M | ☐ |
+| S3-T11 | Update `apps/web/app/api/mcp` route to forward to `mcp.mcpx.gg` for backward compat (or remove if direct deploy works) | apps/web | S | ✓ |
+| S3-T12 | `servers/walrus-search/` package: hono server using `@mcpxgg/server` SDK (skeleton even if SDK is mostly stubbed) | servers/walrus-search | L | ✓ |
+| S3-T13 | walrus-search tools: `index`, `query`, `delete_index` per spec §10.1 | servers/walrus-search | XL | ✓ |
+| S3-T14 | walrus-search infra: vector store (Pinecone or Qdrant); embeddings via OpenAI/Voyage | servers/walrus-search | L | ✓ |
+| S3-T15 | walrus-search published to testnet via raw Move call (CLI exists yet — use raw `sui client` for now) | servers/walrus-search | M | ◐ |
 | S3-T16 | walrus-search deploy to Vercel (or Fly.io); endpoint URL recorded in registry | hosting | M | ☐ |
-| S3-T17 | E2E demo from Cursor: configure Cursor with mcpxgg API key + endpoint; call `walrus-search/query`; receipt visible on testnet explorer | demo | M | ☐ |
-| S3-T18 | First-pass `@mcpxgg/server` SDK skeleton: `createMCPXServer({namespace}).tool({...})` — formalizes what walrus-search did manually | packages/sdk-server | L | ☐ |
+| S3-T17 | E2E demo from Cursor: configure Cursor with mcpxgg API key + endpoint; call `walrus-search/query`; receipt visible on testnet explorer | demo | M | ◐ |
+| S3-T18 | First-pass `@mcpxgg/server` SDK skeleton: `createMCPXServer({namespace}).tool({...})` — formalizes what walrus-search did manually | packages/sdk-server | L | ✓ |
+
+**Sprint 3 status (2026-05-16).** All code-side tasks ✓. The legacy Web2
+gateway was fully replaced with a chain-backed gateway (auth → preflight →
+execute → Walrus archive → facilitator settle → `_meta.receipt`).
+`@mcpxgg/walrus` (HTTP + in-memory backend) and `@mcpxgg/server` SDK are now
+real (no longer stubs). `apps/web/api/mcp` reverse-proxies the standalone
+gateway. Outstanding (need live credentials, mirroring S1/S2): S3-T09
+(Fly.io), S3-T10 (`mcp.mcpx.gg` DNS), S3-T16 (walrus-search deploy); S3-T15
+and S3-T17 are ◐ — `scripts/publish-server.sh` and the Cursor E2E runbook
+(`apps/gateway/DEPLOY.md`) are written but the on-chain publish + live demo
+need S1-T17 testnet deploy + a funded keystore. Test stats: 156 TS tests
+passing (walrus 7, sdk-server 7, gateway 9 incl. full gateway→facilitator
+E2E, walrus-search 5, x402 29, shared 16, facilitator 44, indexer 39) + 65
+Move. Repo-wide CI false-green fixed: `test` scripts now glob `src/**/*.test.ts`
+(the bare `--test` discovered 0 files on Node 21). Turbo typecheck green
+across all 21 packages.
 
 **Definition of Done.**
 - Gateway live at `mcp.mcpx.gg`

@@ -1,109 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateApiKey, AuthError } from "@/lib/gateway/auth";
-import { handleMcpRequest } from "@/lib/gateway/handler";
+
+/**
+ * S3-T11: this route is now a thin reverse proxy to the standalone gateway
+ * service at `mcp.mcpx.gg` (apps/gateway). The chain-backed gateway logic
+ * lives there; mcpx.gg keeps `/api/mcp` working for backward compatibility
+ * with already-distributed client configs.
+ */
+
+const GATEWAY_URL = process.env.GATEWAY_URL ?? "https://mcp.mcpx.gg";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
 };
 
-/**
- * OPTIONS handler for CORS preflight.
- */
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: CORS_HEADERS,
-  });
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-/**
- * POST /api/mcp
- *
- * Main MCP protocol endpoint.
- * Accepts JSON-RPC requests, authenticates via Authorization header,
- * and delegates to the gateway handler.
- */
 export async function POST(request: NextRequest) {
+  const bodyText = await request.text();
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const auth = request.headers.get("authorization");
+  const apiKey = request.headers.get("x-api-key");
+  if (auth) headers.authorization = auth;
+  if (apiKey) headers["x-api-key"] = apiKey;
+
   try {
-    // Parse body
-    const body = await request.json() as any;
-
-    if (!body || !body.jsonrpc || !body.method) {
-      return NextResponse.json(
-        {
-          jsonrpc: "2.0",
-          id: body?.id ?? null,
-          error: {
-            code: -32600,
-            message: "Invalid JSON-RPC request: missing jsonrpc or method",
-          },
-        },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    // Extract API key from Authorization header
-    const authHeader = request.headers.get("Authorization") || "";
-    const apiKey = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7).trim()
-      : authHeader.trim();
-
-    // Authenticate
-    const auth = await authenticateApiKey(apiKey);
-
-    // Handle the MCP request
-    const response = await handleMcpRequest(body, auth);
-
-    return NextResponse.json(response, {
-      status: 200,
-      headers: CORS_HEADERS,
+    const upstream = await fetch(`${GATEWAY_URL}/`, {
+      method: "POST",
+      headers,
+      body: bodyText,
     });
-  } catch (err: any) {
-    // Handle authentication errors
-    if (err instanceof AuthError) {
-      return NextResponse.json(
-        {
-          jsonrpc: "2.0",
-          id: null,
-          error: {
-            code: -32009,
-            message: err.message,
-            data: { error_code: err.code },
-          },
-        },
-        { status: 401, headers: CORS_HEADERS }
-      );
-    }
-
-    // Handle JSON parse errors
-    if (err instanceof SyntaxError) {
-      return NextResponse.json(
-        {
-          jsonrpc: "2.0",
-          id: null,
-          error: {
-            code: -32700,
-            message: "Parse error: invalid JSON",
-          },
-        },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    // Unexpected error
-    console.error("[api/mcp] Unhandled error:", err);
+    const text = await upstream.text();
+    return new NextResponse(text, {
+      status: upstream.status,
+      headers: {
+        ...CORS_HEADERS,
+        "content-type": upstream.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (err) {
+    console.error("[api/mcp] gateway proxy failed:", err);
     return NextResponse.json(
       {
         jsonrpc: "2.0",
         id: null,
-        error: {
-          code: -32603,
-          message: "Internal server error",
-        },
+        error: { code: -32603, message: "Gateway unreachable" },
       },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 502, headers: CORS_HEADERS },
     );
   }
 }

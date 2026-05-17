@@ -1,0 +1,65 @@
+{
+  "namespace": "walrus-search",
+  "name": "Walrus Search",
+  "description": "Semantic search over documents, durably archived to Walrus. Index a corpus, then query it in natural language.",
+  "category": "intelligence",
+  "tags": ["search", "embeddings", "walrus", "rag"],
+  "triggerPhrases": ["search my docs", "semantic search", "find similar documents"],
+  "endpointUrl": "https://walrus-search.mcpx.gg",
+  "tools": [
+    {
+      "name": "index",
+      "description": "Embed and index documents. The corpus is archived to Walrus and the blob id returned.",
+      "priceAtomic": "10000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 60,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": { "type": "string" },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "text": { "type": "string" },
+                "metadata": { "type": "object" }
+              },
+              "required": ["id", "text"]
+            }
+          }
+        },
+        "required": ["indexName", "documents"]
+      }
+    },
+    {
+      "name": "query",
+      "description": "Semantic search. Returns the topK most similar documents with scores.",
+      "priceAtomic": "5000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": { "type": "string" },
+          "query": { "type": "string" },
+          "topK": { "type": "number" }
+        },
+        "required": ["indexName", "query"]
+      }
+    },
+    {
+      "name": "delete_index",
+      "description": "Delete an index and all of its vectors.",
+      "priceAtomic": "0",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": { "indexName": { "type": "string" } },
+        "required": ["indexName"]
+      }
+    }
+  ]
+}

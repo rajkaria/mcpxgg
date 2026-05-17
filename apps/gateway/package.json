@@ -1,23 +1,36 @@
 {
   "name": "@mcpxgg/gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "MCPX gateway service — JSON-RPC at mcp.mcpx.gg, Sprint 3 fully wires this",
+  "type": "module",
+  "description": "MCPX gateway service — MCP JSON-RPC at mcp.mcpx.gg. Settles via the x402 facilitator, archives to Walrus.",
+  "main": "./src/index.ts",
   "scripts": {
-    "dev": "echo 'gateway: scaffold only, see docs/SPRINTS.md Sprint 3'",
-    "build": "echo 'gateway: build wired in Sprint 3'",
-    "lint": "echo 'gateway: lint wired in Sprint 3'",
-    "typecheck": "echo 'gateway: typecheck wired in Sprint 3'",
-    "test": "echo 'gateway: tests added in Sprint 3'"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'gateway: lint placeholder'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.0",
     "@mcpxgg/chain": "workspace:*",
     "@mcpxgg/shared": "workspace:*",
     "@mcpxgg/walrus": "workspace:*",
-    "@mcpxgg/x402": "workspace:*"
+    "@mcpxgg/x402": "workspace:*",
+    "hono": "^4.6.0",
+    "pino": "^9.5.0"
+  },
+  "optionalDependencies": {
+    "@supabase/supabase-js": "^2.99.2",
+    "@upstash/redis": "^1.37.0"
   },
   "devDependencies": {
+    "@mcpxgg/facilitator": "workspace:*",
+    "@mcpxgg/server": "workspace:*",
     "typescript": "^5",
-    "@types/node": "^22"
+    "@types/node": "^22",
+    "tsx": "^4.19.0"
   }
 }

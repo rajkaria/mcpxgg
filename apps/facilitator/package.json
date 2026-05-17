@@ -6,13 +6,20 @@
   "description": "Sui x402 facilitator — open-source canonical implementation.",
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./app": "./src/app.ts",
+    "./env": "./src/env.ts",
+    "./gas-station": "./src/gas-station.ts",
+    "./testing": "./src/sui/in-memory-backend.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'facilitator: lint placeholder'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test"
+    "test": "node --import tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

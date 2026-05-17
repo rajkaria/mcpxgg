@@ -1,45 +1,114 @@
 /**
  * @mcpxgg/walrus — Walrus + Seal client wrapper.
  *
- * Wired in Sprint 0 (spike) and Sprint 4 (production).
+ * High-level API used by the gateway (S3-T05, archive request/response) and
+ * walrus-search (S3-T13, persist indexed documents).
+ *
+ *   const walrus = createWalrusClient();              // in-memory (dev/test)
+ *   const walrus = createWalrusClient(walrusEnv());    // HTTP (prod)
+ *   const { blobId } = await walrus.uploadJSON({ ... });
+ *   const obj = await walrus.retrieveJSON(blobId);
  */
 
-export const PACKAGE_VERSION = '0.1.0';
+import type { WalrusBackend } from './backend.js';
+import { WalrusError } from './backend.js';
+import { createInMemoryWalrusBackend } from './in-memory.js';
+import { createHttpWalrusBackend } from './http.js';
 
-export interface UploadOptions {
-  contentType?: string;
-  retention?: 'permanent' | 'short';
-  encryptedFor?: string[]; // Seal recipient addresses
-}
+export const PACKAGE_VERSION = '0.2.0';
+
+export type { WalrusBackend, StoredBlob, WalrusErrorCode } from './backend.js';
+export { WalrusError } from './backend.js';
+export { createInMemoryWalrusBackend } from './in-memory.js';
+export type { InMemoryWalrusBackend } from './in-memory.js';
+export { createHttpWalrusBackend } from './http.js';
+export type { HttpWalrusOptions } from './http.js';
+export { sealEncrypt, sealDecrypt } from './seal.js';
+export type { SealEnvelope } from './seal.js';
 
 export interface BlobMetadata {
   blobId: string;
   size: number;
   contentType: string;
   uploadedAt: number;
-  isEncrypted: boolean;
 }
 
-export async function upload(_data: Uint8Array, _opts?: UploadOptions): Promise<BlobMetadata> {
-  throw new Error('walrus.upload — wired in Sprint 0 spike, see docs/SPRINTS.md S0-T10');
+export interface WalrusClient {
+  upload(data: Uint8Array, contentType?: string): Promise<BlobMetadata>;
+  uploadJSON(value: unknown): Promise<BlobMetadata>;
+  retrieve(blobId: string): Promise<Uint8Array>;
+  retrieveJSON<T = unknown>(blobId: string): Promise<T>;
+  has(blobId: string): Promise<boolean>;
+  readonly backend: WalrusBackend;
 }
 
-export async function retrieve(_blobId: string): Promise<Uint8Array> {
-  throw new Error('walrus.retrieve — wired in Sprint 0 spike, see docs/SPRINTS.md S0-T10');
+export interface WalrusEnv {
+  publisherUrl?: string;
+  aggregatorUrl?: string;
+  epochs?: number;
 }
 
-export async function metadata(_blobId: string): Promise<BlobMetadata> {
-  throw new Error('walrus.metadata — wired in Sprint 0 spike, see docs/SPRINTS.md S0-T10');
+/**
+ * Reads Walrus config from the environment. Returns `null` if not configured
+ * (callers fall back to the in-memory backend — never a hard failure in dev).
+ */
+export function walrusEnv(env: NodeJS.ProcessEnv = process.env): WalrusEnv | null {
+  const publisherUrl = env.WALRUS_PUBLISHER_URL;
+  const aggregatorUrl = env.WALRUS_AGGREGATOR_URL;
+  if (!publisherUrl || !aggregatorUrl) return null;
+  return {
+    publisherUrl,
+    aggregatorUrl,
+    ...(env.WALRUS_EPOCHS ? { epochs: Number.parseInt(env.WALRUS_EPOCHS, 10) } : {}),
+  };
 }
 
-// Seal helpers
-export async function sealEncrypt(
-  _data: Uint8Array,
-  _recipients: string[],
-): Promise<{ ciphertext: Uint8Array; encryptedKeys: Record<string, Uint8Array> }> {
-  throw new Error('walrus.sealEncrypt — wired in Sprint 0 spike, see docs/SPRINTS.md S0-T11');
+export function createWalrusClient(cfg?: WalrusEnv | null): WalrusClient {
+  const backend: WalrusBackend =
+    cfg && cfg.publisherUrl && cfg.aggregatorUrl
+      ? createHttpWalrusBackend({
+          publisherUrl: cfg.publisherUrl,
+          aggregatorUrl: cfg.aggregatorUrl,
+          ...(cfg.epochs ? { epochs: cfg.epochs } : {}),
+        })
+      : createInMemoryWalrusBackend();
+
+  return {
+    backend,
+
+    async upload(data: Uint8Array, contentType = 'application/octet-stream'): Promise<BlobMetadata> {
+      const { blobId, size } = await backend.store(data);
+      return { blobId, size, contentType, uploadedAt: Date.now() };
+    },
+
+    async uploadJSON(value: unknown): Promise<BlobMetadata> {
+      const bytes = new TextEncoder().encode(JSON.stringify(value));
+      const { blobId, size } = await backend.store(bytes);
+      return { blobId, size, contentType: 'application/json', uploadedAt: Date.now() };
+    },
+
+    async retrieve(blobId: string): Promise<Uint8Array> {
+      return backend.read(blobId);
+    },
+
+    async retrieveJSON<T = unknown>(blobId: string): Promise<T> {
+      const bytes = await backend.read(blobId);
+      try {
+        return JSON.parse(new TextDecoder().decode(bytes)) as T;
+      } catch (e) {
+        throw new WalrusError('retrieve_failed', `blob ${blobId} is not valid JSON: ${String(e)}`);
+      }
+    },
+
+    async has(blobId: string): Promise<boolean> {
+      return backend.has(blobId);
+    },
+  };
 }
 
-export async function sealDecrypt(_ciphertext: Uint8Array, _myKey: Uint8Array): Promise<Uint8Array> {
-  throw new Error('walrus.sealDecrypt — wired in Sprint 0 spike, see docs/SPRINTS.md S0-T11');
+/** Process-default client. In-memory unless WALRUS_* env is set. */
+let defaultClient: WalrusClient | null = null;
+export function getDefaultWalrusClient(): WalrusClient {
+  if (!defaultClient) defaultClient = createWalrusClient(walrusEnv());
+  return defaultClient;
 }

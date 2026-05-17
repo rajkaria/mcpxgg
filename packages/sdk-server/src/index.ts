@@ -1,10 +1,6 @@
 /**
  * @mcpxgg/server — SDK for developers building MCP servers on mcpxgg.
  *
- * Wired in Sprint 3.
- *
- * Usage (planned):
- *
  *   import { createMCPXServer } from '@mcpxgg/server';
  *
  *   const server = createMCPXServer({ namespace: 'my-server' });
@@ -13,15 +9,22 @@
  *     inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
  *     pricing: { perCallAtomic: 5_000n }, // 0.005 USDsui
  *     handler: async (args, ctx) => {
- *       // ctx.payerAddress, ctx.txDigest populated post-settlement
+ *       // ctx.payerAddress / ctx.txDigest populated post-settlement by the gateway
  *       return { result: '...' };
  *     },
  *   });
  *   server.listen(3000);
  */
 
-export const SDK_VERSION = '0.1.0';
-
-export function createMCPXServer(_opts: { namespace: string }): never {
-  throw new Error('createMCPXServer — wired in Sprint 3, see docs/SPRINTS.md');
-}
+export { createMCPXServer, SDK_VERSION } from './server.js';
+export type { MCPXServer } from './server.js';
+export type {
+  MCPXServerOptions,
+  ToolDefinition,
+  ToolHandler,
+  ToolContext,
+  ToolPricing,
+  ToolResult,
+  RegisteredTool,
+  ServerManifest,
+} from './types.js';
