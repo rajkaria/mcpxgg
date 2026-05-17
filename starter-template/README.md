@@ -40,13 +40,39 @@ mcpx.config.json   Platform configuration
 
 See `PROMPT.md` for the complete build guide (also useful as an AI prompt).
 
-## Credit Costs
+## Pricing (USDsui)
 
-| Cost | Use Case |
-|------|----------|
-| 1    | Simple read-only operations |
-| 3    | External API calls |
-| 10   | AI models or heavy compute |
+Every tool is priced in `priceAtomic` — a string integer in USDsui's smallest
+unit (6 decimals), so `"1000"` = $0.001. There are no credits. Set
+`freeTierCallsPerUser` to give each caller N free calls before settlement starts.
+
+| `priceAtomic` | USD | Use Case |
+|------|------|----------|
+| `"1000"`   | $0.001 | Simple read-only operations |
+| `"5000"`   | $0.005 | External API calls |
+| `"50000"`  | $0.05  | AI models or heavy compute |
+
+The full schema reference (every field, the bigint convention, an annotated
+example) lives in the docs: `apps/docs/content/mcpx-config-schema.md`.
+
+## Publishing
+
+This template uses the `@mcpxgg/server` SDK and publishes on-chain with the CLI:
+
+```bash
+# Validate mcpx.config.json against the platform schema
+npx mcpxgg validate
+
+# Dry-run the publish (prints the Walrus uploads + the publish_server PTB)
+npx mcpxgg publish
+
+# Sign + submit (needs a funded Sui key; see the CLI help)
+npx mcpxgg publish --private-key "$MCPXGG_PUBLISH_KEY"
+```
+
+`mcpxgg publish` validates the config, checks namespace uniqueness on-chain,
+probes your `/health` endpoint, uploads the README + tool schemas to Walrus,
+then builds the `mcpx::registry::publish_server` transaction for you to sign.
 
 ## Scripts
 
@@ -56,7 +82,8 @@ See `PROMPT.md` for the complete build guide (also useful as an AI prompt).
 | `npm run test` | Run the automated test harness |
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm run generate-config` | Regenerate `mcpx.config.json` from tools |
-| `npm run validate` | Validate config against MCPX schema |
+| `npm run validate` | Validate config via `npx mcpxgg validate` |
+| `npm run publish` | Publish on-chain via `npx mcpxgg publish` |
 
 ## Deploying
 

@@ -134,3 +134,166 @@ export async function buildWithdrawTx(args: {
   const txBytes = await tx.build({ client });
   return { txBytesB64: Buffer.from(txBytes).toString('base64') };
 }
+
+/**
+ * S5-T16 — composable bundles.
+ *
+ * Move entry points (contracts/sources/bundle.move):
+ *   mcpx::bundle::create(name, server_ids, price_multiplier_x100,
+ *                        metadata_blob_id, clock, ctx) -> ID
+ *     `create` shares the Bundle internally and returns its ID. The returned
+ *     `ID` has `copy, drop` so the PTB can discard it.
+ *   mcpx::bundle::activate_for_user(bundle, clock, ctx)
+ *     emits BundleActivated for the sender; takes the shared `&Bundle` + Clock.
+ *
+ * `server_ids: vector<ID>` — Sui `ID` is BCS-identical to `address`; the
+ * builder makes a Move vector of `0x2::object::ID` from the id strings.
+ */
+export async function buildCreateBundleTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  name: string;
+  serverObjectIds: string[];
+  /** Multiplier × 100 (e.g. 90 = 0.9× = 10% discount). 1..1000. */
+  priceMultiplierX100: number;
+  metadataBlobId?: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const enc = (s: string) => Array.from(new TextEncoder().encode(s));
+  const serverIds = tx.makeMoveVec({
+    type: '0x2::object::ID',
+    elements: args.serverObjectIds.map((id) => tx.pure.address(id)),
+  });
+  tx.moveCall({
+    target: `${args.cfg.packageId}::bundle::create`,
+    arguments: [
+      tx.pure.vector('u8', enc(args.name)),
+      serverIds,
+      tx.pure.u32(args.priceMultiplierX100),
+      tx.pure.vector('u8', enc(args.metadataBlobId ?? '')),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+export async function buildActivateBundleTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  bundleObjectId: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  tx.moveCall({
+    target: `${args.cfg.packageId}::bundle::activate_for_user`,
+    arguments: [
+      tx.object(args.bundleObjectId), // shared &Bundle
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/** A tool as it goes into `mcpx::registry::add_tool`. */
+export interface PublishToolInput {
+  name: string;
+  description: string;
+  inputSchemaBlobId: string;
+  priceAtomic: bigint;
+  freeTierCallsPerUser: number;
+  timeoutSeconds: number;
+}
+
+/**
+ * Builds the publish PTB used by `@mcpxgg/cli`:
+ *   1. `registry::publish_server` → returns a `ServerOwnerCap`
+ *   2. `registry::add_tool` once per tool (atomic with the publish)
+ *   3. transfers the `ServerOwnerCap` to the sender
+ *
+ * Move entry points (contracts/sources/registry.move):
+ *   mcpx::registry::publish_server(registry, namespace_bytes, endpoint_url,
+ *                                  metadata_blob_id, category, clock, ctx) -> ServerOwnerCap
+ *   mcpx::registry::add_tool(server, cap, name_bytes, description,
+ *                            input_schema_blob_id, price_atomic,
+ *                            free_tier_calls_per_user, timeout_seconds, clock)
+ *
+ * NOTE: `add_tool` takes `&mut Server`, and `publish_server` *shares* the
+ * Server object internally, so tools cannot be added in the same PTB as the
+ * publish. The CLI therefore publishes first, then issues a follow-up
+ * add-tools PTB once the shared Server id is known. This builder assembles
+ * only the `publish_server` call (+ cap transfer); see
+ * `buildAddToolsTx` for the second step.
+ */
+export async function buildPublishServerTx(args: {
+  cfg: SuiTxConfig;
+  /** Shared NamespaceRegistry object id (cfg.sessionRegistryId reused). */
+  registryId: string;
+  sender: string;
+  namespace: string;
+  endpointUrl: string;
+  metadataBlobId: string;
+  category: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const enc = (s: string) => Array.from(new TextEncoder().encode(s));
+  const cap = tx.moveCall({
+    target: `${args.cfg.packageId}::registry::publish_server`,
+    arguments: [
+      tx.object(args.registryId),
+      tx.pure.vector('u8', enc(args.namespace)),
+      tx.pure.vector('u8', enc(args.endpointUrl)),
+      tx.pure.vector('u8', enc(args.metadataBlobId)),
+      tx.pure.vector('u8', enc(args.category)),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  tx.transferObjects([cap], tx.pure.address(args.sender));
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/**
+ * Second-step PTB: adds every tool to an already-published (shared) Server.
+ * Atomic across all tools — either every tool lands or none do.
+ */
+export async function buildAddToolsTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  serverObjectId: string;
+  ownerCapId: string;
+  tools: PublishToolInput[];
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const enc = (s: string) => Array.from(new TextEncoder().encode(s));
+  for (const t of args.tools) {
+    tx.moveCall({
+      target: `${args.cfg.packageId}::registry::add_tool`,
+      arguments: [
+        tx.object(args.serverObjectId),
+        tx.object(args.ownerCapId),
+        tx.pure.vector('u8', enc(t.name)),
+        tx.pure.vector('u8', enc(t.description)),
+        tx.pure.vector('u8', enc(t.inputSchemaBlobId)),
+        tx.pure.u64(t.priceAtomic),
+        tx.pure.u64(BigInt(t.freeTierCallsPerUser)),
+        tx.pure.u32(t.timeoutSeconds),
+        tx.object('0x6'), // Clock
+      ],
+    });
+  }
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}

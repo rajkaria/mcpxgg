@@ -6,6 +6,7 @@
 
 import type {
   AuthIdentity,
+  BundleSummary,
   CallReceipt,
   ChainAdapter,
   ChainId,
@@ -42,6 +43,8 @@ export class InMemorySuiAdapter implements ChainAdapter {
 
   private sessions = new Map<string, Session>();
   private vaults = new Map<string, DeveloperVault>();
+  private namespaces = new Set<string>();
+  private bundles = new Map<string, BundleSummary>();
   private seq = 0;
 
   private nextDigest(): string {
@@ -127,13 +130,29 @@ export class InMemorySuiAdapter implements ChainAdapter {
   }
 
   async publishServer(
-    _params: PublishServerParams,
+    params: PublishServerParams,
   ): Promise<{ serverObjectId: string; ownerCapId: string; tx: TxResult }> {
+    if (this.namespaces.has(params.namespace)) {
+      return {
+        serverObjectId: '',
+        ownerCapId: '',
+        tx: {
+          txDigest: '',
+          effectsStatus: 'failure',
+          errorMessage: `namespace "${params.namespace}" already taken`,
+        },
+      };
+    }
+    this.namespaces.add(params.namespace);
     return {
       serverObjectId: this.nextId('5e54'),
       ownerCapId: this.nextId('cap0'),
       tx: { txDigest: this.nextDigest(), effectsStatus: 'success' },
     };
+  }
+
+  async isNamespaceTaken(namespace: string): Promise<boolean> {
+    return this.namespaces.has(namespace);
   }
 
   async updateServer(_params: UpdateServerParams): Promise<TxResult> {
@@ -142,6 +161,36 @@ export class InMemorySuiAdapter implements ChainAdapter {
 
   async settleCall(_params: SettleParams): Promise<CallReceipt> {
     throw new Error('settleCall goes through the facilitator, not the adapter');
+  }
+
+  /**
+   * Test/dev seam: models `mcpx::bundle::create` deterministically. Real
+   * creation happens via buildCreateBundleTx + a signed PTB; the indexer
+   * then mirrors BundleCreated. Returns the new bundle object id.
+   */
+  createBundle(params: {
+    name: string;
+    creatorAddress: string;
+    serverObjectIds: string[];
+    priceMultiplierX100: number;
+  }): string {
+    const id = this.nextId('b00d');
+    this.bundles.set(id, {
+      bundleObjectId: id,
+      name: params.name,
+      creatorAddress: normalizeSuiAddress(params.creatorAddress),
+      serverObjectIds: [...params.serverObjectIds],
+      priceMultiplierX100: params.priceMultiplierX100,
+      active: true,
+    });
+    return id;
+  }
+
+  async listBundles(): Promise<BundleSummary[]> {
+    return [...this.bundles.values()].map((b) => ({
+      ...b,
+      serverObjectIds: [...b.serverObjectIds],
+    }));
   }
 
   subscribeEvents(_handler: EventHandler): EventSubscription {

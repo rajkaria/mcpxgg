@@ -28,6 +28,7 @@ import type {
   EventHandler,
   EventSubscription,
   FacilitatorClient,
+  BundleSummary,
 } from './types';
 import { normalizeSuiAddress } from './sui/address';
 
@@ -110,6 +111,49 @@ export class SuiAdapter implements ChainAdapter {
     throw new NotImplemented('updateServer', '5');
   }
 
+  /**
+   * Namespace uniqueness check via a read-only `devInspect` call into
+   * `mcpx::registry::namespace_taken`. Needs `MCPX_PACKAGE_ID`,
+   * `MCPX_REGISTRY_ID`, and `SUI_RPC_URL` in the environment.
+   */
+  async isNamespaceTaken(namespace: string): Promise<boolean> {
+    const packageId = process.env.MCPX_PACKAGE_ID;
+    const registryId = process.env.MCPX_REGISTRY_ID;
+    const rpcUrl =
+      process.env.SUI_RPC_URL ?? 'https://fullnode.testnet.sui.io:443';
+    if (!packageId || !registryId) {
+      throw new Error(
+        'SuiAdapter.isNamespaceTaken: set MCPX_PACKAGE_ID and MCPX_REGISTRY_ID',
+      );
+    }
+    const [{ Transaction }, { SuiClient }, { bcs }] = await Promise.all([
+      import('@mysten/sui/transactions'),
+      import('@mysten/sui/client'),
+      import('@mysten/sui/bcs'),
+    ]);
+    const client = new SuiClient({ url: rpcUrl });
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::registry::namespace_taken`,
+      arguments: [
+        tx.object(registryId),
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(namespace))),
+      ],
+    });
+    const res = await client.devInspectTransactionBlock({
+      sender:
+        '0x0000000000000000000000000000000000000000000000000000000000000000',
+      transactionBlock: tx,
+    });
+    const ret = res.results?.[0]?.returnValues?.[0];
+    if (!ret) {
+      throw new Error(
+        `SuiAdapter.isNamespaceTaken: devInspect returned no value (${res.error ?? 'unknown'})`,
+      );
+    }
+    return bcs.Bool.parse(Uint8Array.from(ret[0])) === true;
+  }
+
   async settleCall(_params: SettleParams): Promise<CallReceipt> {
     throw new NotImplemented('settleCall', '2');
   }
@@ -120,6 +164,13 @@ export class SuiAdapter implements ChainAdapter {
 
   async claimPayout(_developerAddress: string): Promise<TxResult> {
     throw new NotImplemented('claimPayout', '5');
+  }
+
+  async listBundles(): Promise<BundleSummary[]> {
+    // Reads go through the indexer mirror (ADR-011), not chain RPC; the web
+    // app uses apps/web/lib/chain/reads.ts:listBundles. Direct chain
+    // enumeration would require an object-index sweep — out of scope.
+    throw new NotImplemented('listBundles', '5');
   }
 
   subscribeEvents(_handler: EventHandler): EventSubscription {

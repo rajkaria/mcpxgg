@@ -9,9 +9,11 @@
     "test": "tsx scripts/test.ts",
     "build": "tsc",
     "generate-config": "tsx scripts/generate-config.ts",
-    "validate": "tsx scripts/validate.ts"
+    "validate": "npx mcpxgg validate",
+    "publish": "npx mcpxgg publish"
   },
   "dependencies": {
+    "@mcpxgg/server": "workspace:*",
     "express": "^4.21.0",
     "zod": "^3.23.0"
   },

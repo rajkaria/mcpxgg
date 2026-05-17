@@ -1,0 +1,29 @@
+# Fly.io app for the sui-defi-data anchor server (S5-T01).
+# Optional secrets: DEFI_CETUS_URL, DEFI_BLUEFIN_URL, DEFI_SCALLOP_URL,
+# DEFI_NAVI_URL, DEFI_DEEPBOOK_URL, DEFI_PRICE_URL. Defaults are hermetic
+# (deterministic in-memory fixture), so the server boots and demos offline.
+app = "mcpxgg-sui-defi-data"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3011"
+
+[http_service]
+  internal_port = 3011
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "15s"
+  timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

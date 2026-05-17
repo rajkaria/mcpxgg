@@ -407,6 +407,21 @@ export interface Database {
         };
         Relationships: [];
       };
+      bundles_public: {
+        Row: {
+          bundle_object_id: string;
+          name: string | null;
+          creator_address: string;
+          server_count: number;
+          price_multiplier_x100: number;
+          metadata_blob_id: string | null;
+          active: boolean;
+          tx_digest: string | null;
+          created_at: string | null;
+          discount_pct: number;
+        };
+        Relationships: [];
+      };
       live_feed_24h: {
         Row: {
           tx_digest: string | null;

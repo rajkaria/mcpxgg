@@ -45,6 +45,28 @@ test('session lifecycle: create → deposit → withdraw', async () => {
   assert.equal(a.getSession(session.sessionObjectId)?.balanceAtomic, 1_000_000n);
 });
 
+test('bundles: createBundle → listBundles is deterministic + isolated', async () => {
+  const a = new InMemorySuiAdapter();
+  assert.deepEqual(await a.listBundles(), []);
+  const id = a.createBundle({
+    name: 'DeFi research',
+    creatorAddress: '0xcafe',
+    serverObjectIds: ['0xaaa', '0xbbb'],
+    priceMultiplierX100: 90,
+  });
+  assert.equal(isSuiAddress(id), true);
+  const list = await a.listBundles();
+  assert.equal(list.length, 1);
+  assert.equal(list[0]?.name, 'DeFi research');
+  assert.equal(list[0]?.priceMultiplierX100, 90);
+  assert.equal(list[0]?.active, true);
+  assert.deepEqual(list[0]?.serverObjectIds, ['0xaaa', '0xbbb']);
+  assert.equal(list[0]?.creatorAddress, `0x${'0'.repeat(60)}cafe`);
+  // Mutating the returned copy must not corrupt internal state.
+  list[0]!.serverObjectIds.push('0xZZZ');
+  assert.equal((await a.listBundles())[0]?.serverObjectIds.length, 2);
+});
+
 test('explorer urls', () => {
   const a = new InMemorySuiAdapter();
   assert.match(a.txExplorerUrl('0xd'), /suiscan\.xyz\/testnet\/tx\/0xd/);

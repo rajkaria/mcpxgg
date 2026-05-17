@@ -15,7 +15,8 @@
     {
       "name": "echo",
       "description": "Echo a message back. Useful for testing connectivity.",
-      "creditCost": 1,
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 5,
       "timeoutSeconds": 5,
       "inputSchema": {
         "type": "object",
@@ -33,7 +34,8 @@
     {
       "name": "random_number",
       "description": "Generate a random number between min and max (inclusive).",
-      "creditCost": 1,
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 5,
       "timeoutSeconds": 5,
       "inputSchema": {
         "type": "object",

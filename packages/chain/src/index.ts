@@ -15,6 +15,17 @@ export {
   buildCreateSessionAndDepositTx,
   buildDepositTx,
   buildWithdrawTx,
+  buildPublishServerTx,
+  buildAddToolsTx,
+  buildCreateBundleTx,
+  buildActivateBundleTx,
   type SuiTxConfig,
   type BuiltTx,
+  type PublishToolInput,
 } from './sui/tx-builder';
+export {
+  signAndExecuteBase64Tx,
+  type SignAndExecuteParams,
+  type SignAndExecuteResult,
+  type CreatedObject,
+} from './sui/signer';

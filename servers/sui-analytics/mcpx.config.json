@@ -1,0 +1,71 @@
+{
+  "namespace": "sui-analytics",
+  "name": "Sui Analytics",
+  "description": "Natural-language analytics over indexed Sui state. Ask questions in plain English, get whale alerts, address and object history.",
+  "category": "analytics",
+  "tags": ["analytics", "sui", "sql", "whale-alert", "indexer"],
+  "triggerPhrases": ["query sui data", "whale alert", "address history", "analyze on-chain activity"],
+  "endpointUrl": "https://sui-analytics.mcpx.gg",
+  "tools": [
+    {
+      "name": "query",
+      "description": "Ask an analytics question in natural language. Translated to a guarded read-only SQL SELECT over indexed Sui state.",
+      "priceAtomic": "8000",
+      "freeTierCallsPerUser": 1,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "maxRows": { "type": "number" }
+        },
+        "required": ["question"]
+      }
+    },
+    {
+      "name": "address_history",
+      "description": "Transaction / transfer history for a Sui address, newest first.",
+      "priceAtomic": "3000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" },
+          "limit": { "type": "number" }
+        },
+        "required": ["address"]
+      }
+    },
+    {
+      "name": "object_history",
+      "description": "Version / owner history for a Sui object, newest version first.",
+      "priceAtomic": "3000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": { "type": "string" },
+          "limit": { "type": "number" }
+        },
+        "required": ["objectId"]
+      }
+    },
+    {
+      "name": "whale_alert",
+      "description": "Large transfers at or above a USD threshold within a trailing time window.",
+      "priceAtomic": "2000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "minUsd": { "type": "number" },
+          "windowHours": { "type": "number" }
+        },
+        "required": []
+      }
+    }
+  ]
+}

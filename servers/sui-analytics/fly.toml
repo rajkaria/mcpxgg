@@ -1,0 +1,29 @@
+# Fly.io app for the sui-analytics anchor server (S5-T04).
+# Optional secrets: ANTHROPIC_API_KEY (upgrades NL->SQL to Claude Haiku),
+# ANALYTICS_PG_URL / ANALYTICS_CLICKHOUSE_URL (real indexed Sui state).
+# Defaults are hermetic: in-memory store + heuristic NL->SQL.
+app = "mcpxgg-sui-analytics"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3012"
+
+[http_service]
+  internal_port = 3012
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "15s"
+  timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

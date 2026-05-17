@@ -182,6 +182,67 @@ export async function getPlatformTotals(): Promise<{
   return { cumulativeSettledAtomic: gross, callsToday: calls };
 }
 
+export interface BundleRow {
+  id: string;
+  name: string | null;
+  creator: string;
+  serverCount: number;
+  priceMultiplierX100: number;
+  /** Whole-percent discount derived from the multiplier (90 → 10). */
+  discountPct: number;
+  metadataBlobId: string | null;
+  active: boolean;
+  txDigest: string | null;
+  createdAt: string;
+}
+
+function mapBundle(d: Record<string, unknown>): BundleRow {
+  const mult = Number(d.price_multiplier_x100 ?? 100);
+  return {
+    id: String(d.bundle_object_id),
+    name: (d.name as string) ?? null,
+    creator: String(d.creator_address ?? ""),
+    serverCount: Number(d.server_count ?? 0),
+    priceMultiplierX100: mult,
+    discountPct:
+      typeof d.discount_pct === "number"
+        ? d.discount_pct
+        : Math.max(0, 100 - mult),
+    metadataBlobId: (d.metadata_blob_id as string) ?? null,
+    active: d.active === undefined ? true : Boolean(d.active),
+    txDigest: (d.tx_digest as string) ?? null,
+    createdAt: String(d.created_at ?? ""),
+  };
+}
+
+// S5-T17/T19: read the indexer mirror (bundles_public view from migration
+// 009), never chain RPC. Indexer-written only — the web never writes here.
+export async function listBundles(): Promise<BundleRow[]> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("bundles_public")
+    .select(
+      "bundle_object_id, name, creator_address, server_count, price_multiplier_x100, metadata_blob_id, active, tx_digest, created_at, discount_pct",
+    )
+    .eq("active", true)
+    .order("created_at", { ascending: false })) as {
+    data: Array<Record<string, unknown>> | null;
+  };
+  return (data ?? []).map(mapBundle);
+}
+
+export async function getBundle(id: string): Promise<BundleRow | null> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("bundles_public")
+    .select(
+      "bundle_object_id, name, creator_address, server_count, price_multiplier_x100, metadata_blob_id, active, tx_digest, created_at, discount_pct",
+    )
+    .eq("bundle_object_id", id)
+    .maybeSingle()) as { data: Record<string, unknown> | null };
+  return data ? mapBundle(data) : null;
+}
+
 export function usdsui(atomic: bigint): string {
   const whole = atomic / 1_000_000n;
   const frac = (atomic % 1_000_000n).toString().padStart(6, "0").slice(0, 2);

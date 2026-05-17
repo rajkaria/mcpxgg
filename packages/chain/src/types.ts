@@ -62,6 +62,16 @@ export interface DeveloperVault {
   lifetimeEarningsAtomic: bigint;
 }
 
+export interface BundleSummary {
+  bundleObjectId: string;
+  name: string;
+  creatorAddress: string;
+  serverObjectIds: string[];
+  /** Multiplier × 100 (e.g. 90 = 0.9× = 10% discount). */
+  priceMultiplierX100: number;
+  active: boolean;
+}
+
 export interface CreateSessionParams {
   ownerAddress: string;
   initialDepositAtomic: bigint;
@@ -157,6 +167,8 @@ export interface ChainAdapter {
   // Server registry
   publishServer(params: PublishServerParams): Promise<{ serverObjectId: string; ownerCapId: string; tx: TxResult }>;
   updateServer(params: UpdateServerParams): Promise<TxResult>;
+  /** True if `namespace` is already registered on this chain. */
+  isNamespaceTaken(namespace: string): Promise<boolean>;
 
   // Settlement
   settleCall(params: SettleParams): Promise<CallReceipt>;
@@ -164,6 +176,9 @@ export interface ChainAdapter {
   // Vault / payouts
   getDeveloperVault(ownerAddress: string): Promise<DeveloperVault | null>;
   claimPayout(developerAddress: string): Promise<TxResult>;
+
+  // Composable bundles (S5)
+  listBundles(): Promise<BundleSummary[]>;
 
   // Indexer
   subscribeEvents(handler: EventHandler): EventSubscription;

@@ -352,12 +352,18 @@ export async function createSupabaseStorage(
     },
 
     async recordBundleActivation(u: BundleActivation): Promise<void> {
-      const { error } = await sb.from('bundle_activations').insert({
-        bundle_object_id: u.bundleObjectId,
-        user_address: u.userAddress,
-        activated_at: new Date(u.timestampMs).toISOString(),
-        tx_digest: u.txDigest,
-      });
+      // Idempotent on the indexer's natural key (migration 009 adds
+      // uq_bundle_activations_event) so an event replay is a no-op upsert
+      // rather than a duplicate row.
+      const { error } = await sb.from('bundle_activations').upsert(
+        {
+          bundle_object_id: u.bundleObjectId,
+          user_address: u.userAddress,
+          activated_at: new Date(u.timestampMs).toISOString(),
+          tx_digest: u.txDigest,
+        },
+        { onConflict: 'bundle_object_id,user_address,tx_digest' },
+      );
       if (error) throw new Error(`recordBundleActivation: ${error.message}`);
     },
 

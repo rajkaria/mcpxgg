@@ -12,3 +12,13 @@ Public documentation site for mcpxgg. **Sprint 8** (`docs/SPRINTS.md`) fills thi
 - ADRs mirror (read-only of `/docs/DECISIONS.md`)
 - Changelog
 - Blog
+
+## Published content
+
+Until the Sprint 8 site framework lands, finished reference docs live as
+markdown under `content/`:
+
+- [`content/mcpx-config-schema.md`](./content/mcpx-config-schema.md) —
+  full `mcpx.config.json` schema reference (S5-T13): every field, the
+  `priceAtomic` USDsui 6-decimal convention, `freeTierCallsPerUser`, and an
+  annotated example.

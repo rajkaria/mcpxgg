@@ -1,0 +1,86 @@
+{
+  "namespace": "sui-defi-data",
+  "name": "Sui DeFi Data",
+  "description": "Normalized Sui DeFi data across Cetus, Bluefin, Scallop, Navi and DeepBook: liquidity pools, spot prices, pool history and best-route swap quotes.",
+  "category": "defi",
+  "tags": ["defi", "sui", "liquidity", "prices", "swap", "cetus", "bluefin", "deepbook"],
+  "triggerPhrases": [
+    "sui defi pools",
+    "best swap rate on sui",
+    "token price on sui",
+    "liquidity pool tvl"
+  ],
+  "endpointUrl": "https://sui-defi-data.mcpx.gg",
+  "tools": [
+    {
+      "name": "pools",
+      "description": "List normalized liquidity pools across Sui DeFi protocols (TVL, APR, 24h volume).",
+      "priceAtomic": "2000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": ["cetus", "bluefin", "scallop", "navi", "deepbook", "all"]
+          },
+          "limit": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "prices",
+      "description": "Spot USD prices for one or more token symbols.",
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 5,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbols": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["symbols"]
+      }
+    },
+    {
+      "name": "pool_history",
+      "description": "Daily TVL / volume / APR time series for a single pool.",
+      "priceAtomic": "3000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": ["cetus", "bluefin", "scallop", "navi", "deepbook"]
+          },
+          "poolId": { "type": "string" },
+          "days": { "type": "number" }
+        },
+        "required": ["protocol", "poolId"]
+      }
+    },
+    {
+      "name": "swap_quote",
+      "description": "Best-route swap quote for tokenIn to tokenOut (amountIn is atomic).",
+      "priceAtomic": "2000",
+      "freeTierCallsPerUser": 0,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tokenIn": { "type": "string" },
+          "tokenOut": { "type": "string" },
+          "amountIn": { "type": "string" },
+          "protocol": {
+            "type": "string",
+            "enum": ["cetus", "bluefin", "scallop", "navi", "deepbook"]
+          }
+        },
+        "required": ["tokenIn", "tokenOut", "amountIn"]
+      }
+    }
+  ]
+}

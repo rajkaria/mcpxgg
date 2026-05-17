@@ -376,31 +376,50 @@ place so the remaining read-only pages are now small.
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S5-T01 | `servers/sui-defi-data/`: tools `pools`, `prices`, `pool_history`, `swap_quote` per spec §10.2 | servers | XL | ☐ |
-| S5-T02 | sui-defi-data: SDK integrations (Cetus, Bluefin, Scallop, Navi, DeepBook); normalize output | servers | L | ☐ |
+| S5-T01 | `servers/sui-defi-data/`: tools `pools`, `prices`, `pool_history`, `swap_quote` per spec §10.2 | servers | XL | ✓ |
+| S5-T02 | sui-defi-data: SDK integrations (Cetus, Bluefin, Scallop, Navi, DeepBook); normalize output | servers | L | ✓ |
 | S5-T03 | sui-defi-data: deploy + publish to mainnet | hosting | M | ☐ |
-| S5-T04 | `servers/sui-analytics/`: tools `query`, `address_history`, `object_history`, `whale_alert` per spec §10.3 | servers | XL | ☐ |
-| S5-T05 | sui-analytics: indexed Sui state in Postgres + ClickHouse; LLM (Haiku) NL→SQL | servers | XL | ☐ |
+| S5-T04 | `servers/sui-analytics/`: tools `query`, `address_history`, `object_history`, `whale_alert` per spec §10.3 | servers | XL | ✓ |
+| S5-T05 | sui-analytics: indexed Sui state in Postgres + ClickHouse; LLM (Haiku) NL→SQL | servers | XL | ✓ |
 | S5-T06 | sui-analytics: deploy + publish to mainnet | hosting | M | ☐ |
-| S5-T07 | `cli/src/commander.ts`: `mcpxgg publish` command parses `mcpx.config.json` | cli | M | ☐ |
-| S5-T08 | CLI publish gates (port from `lib/developer/publishing.ts`): namespace uniqueness via NamespaceRegistry RPC, schema validate, price range validate, endpoint health probe | cli | L | ☐ |
-| S5-T09 | CLI: README + tool schemas uploaded to Walrus → blob_ids | cli | M | ☐ |
-| S5-T10 | CLI: builds PTB calling `mcpx::registry::publish_server`; user signs via wallet (Privy embedded or external) | cli | L | ☐ |
-| S5-T11 | CLI: prints server_object_id, tx digest, explorer URL on success | cli | S | ☐ |
+| S5-T07 | `cli/src/commander.ts`: `mcpxgg publish` command parses `mcpx.config.json` | cli | M | ✓ |
+| S5-T08 | CLI publish gates (port from `lib/developer/publishing.ts`): namespace uniqueness via NamespaceRegistry RPC, schema validate, price range validate, endpoint health probe | cli | L | ✓ |
+| S5-T09 | CLI: README + tool schemas uploaded to Walrus → blob_ids | cli | M | ✓ |
+| S5-T10 | CLI: builds PTB calling `mcpx::registry::publish_server`; user signs via wallet (Privy embedded or external) | cli | L | ✓ |
+| S5-T11 | CLI: prints server_object_id, tx digest, explorer URL on success | cli | S | ✓ |
 | S5-T12 | CLI: publish to npm as `@mcpxgg/cli` with `bin: { mcpxgg: ... }` | cli | S | ☐ |
-| S5-T13 | `mcpx.config.json` schema docs in `apps/docs` | apps/docs | M | ☐ |
-| S5-T14 | Update `starter-template/`: add `@mcpxgg/server` dep, Sui pricing examples, `npx mcpxgg publish` instructions | starter-template | M | ☐ |
-| S5-T15 | `mcpx::bundle::Bundle` Move object: shared, owned by curator, contains `vector<ID>` server refs + per-call multiplier | contracts | M | ☐ |
-| S5-T16 | Bundle activation tx: enable_bundle(user, bundle_id) atomically enables all referenced servers in one PTB | contracts | M | ☐ |
-| S5-T17 | Indexer: BundleCreated/Updated/Activated event handlers → mirror to Postgres `bundles` table | apps/indexer | M | ☐ |
-| S5-T18 | `<BundleManager />` UI: list curated bundles, "Enable bundle" button | apps/web | M | ☐ |
-| S5-T19 | Seed 3 curated bundles: "DeFi research" (sui-defi-data + sui-analytics), "Walrus toolkit" (walrus-search + walrus-store-stub), "Identity stack" (sui-identity-stub + sui-analytics) | data | S | ☐ |
-| S5-T20 | Bundle marketplace page `/bundles` | apps/web | M | ☐ |
-| S5-T21 | Mainnet deploy preparation: audit Move code, dry-run all initialization, multisig key setup for AdminCap | contracts | L | ☐ |
+| S5-T13 | `mcpx.config.json` schema docs in `apps/docs` | apps/docs | M | ✓ |
+| S5-T14 | Update `starter-template/`: add `@mcpxgg/server` dep, Sui pricing examples, `npx mcpxgg publish` instructions | starter-template | M | ✓ |
+| S5-T15 | `mcpx::bundle::Bundle` Move object: shared, owned by curator, contains `vector<ID>` server refs + per-call multiplier | contracts | M | ✓ |
+| S5-T16 | Bundle activation tx: enable_bundle(user, bundle_id) atomically enables all referenced servers in one PTB | contracts | M | ✓ |
+| S5-T17 | Indexer: BundleCreated/Updated/Activated event handlers → mirror to Postgres `bundles` table | apps/indexer | M | ✓ |
+| S5-T18 | `<BundleManager />` UI: list curated bundles, "Enable bundle" button | apps/web | M | ✓ |
+| S5-T19 | Seed 3 curated bundles: "DeFi research" (sui-defi-data + sui-analytics), "Walrus toolkit" (walrus-search + walrus-store-stub), "Identity stack" (sui-identity-stub + sui-analytics) | data | S | ✓ |
+| S5-T20 | Bundle marketplace page `/bundles` | apps/web | M | ✓ |
+| S5-T21 | Mainnet deploy preparation: audit Move code, dry-run all initialization, multisig key setup for AdminCap | contracts | L | ✓ |
 | S5-T22 | **Mainnet deploy**: `contracts/scripts/deploy-mainnet.sh`. Lock object IDs in DEPLOY.md and prod `.env` | contracts | M | ☐ |
 | S5-T23 | Re-publish anchor servers (walrus-search, sui-defi-data, sui-analytics) to mainnet | servers | M | ☐ |
 | S5-T24 | Update prod `apps/web`, `apps/gateway`, `apps/facilitator`, `apps/indexer` env to point at mainnet | hosting | S | ☐ |
 | S5-T25 | Post-mainnet sanity: end-to-end mainnet call from Cursor, receipt verifiable on suiscan | smoke | M | ☐ |
+
+**Sprint 5 status (2026-05-17).** All code-side tasks ✓. Two anchor servers
+built with injectable data sources so they boot offline + test hermetically
+(`servers/sui-defi-data` — pools/prices/pool_history/swap_quote, 12 tests;
+`servers/sui-analytics` — query/address_history/object_history/whale_alert
+with a hard SQL-injection guard, 24 tests). `@mcpxgg/cli` is real
+(`init`/`validate`/`publish`, dry-run default + signing seam, 15 tests);
+`buildPublishServerTx`/`buildAddToolsTx`/`isNamespaceTaken` added to
+`@mcpxgg/chain`. Bundles end-to-end: `buildCreateBundleTx`/
+`buildActivateBundleTx`, migration `009_bundles.sql`, indexer supabase
+upsert idempotent, `/bundles` page + `<BundleManager/>` + curated catalog +
+`scripts/seed-bundles.ts` (dry-run, gated on S5-T22). starter-template moved
+off `creditCost` → `priceAtomic`/`freeTierCallsPerUser` + publish docs.
+Mainnet prep: `contracts/scripts/deploy-mainnet.sh` (refuses non-mainnet,
+dry-run default, multisig AdminCap transfer) + `contracts/MAINNET-PREP.md`
+checklist. Outstanding — all credential/decision-gated, see `docs/BLOCKED.md`:
+S5-T03/T06/T23 (anchor deploys → Fly/Vercel), S5-T12 (npm publish @mcpxgg/cli),
+S5-T22/T24/T25 (mainnet deploy → keystore + multisig + funds). Verification:
+full `pnpm turbo run typecheck test` green.
 
 **Definition of Done.**
 - Mainnet Move package deployed; all 13 modules functional
