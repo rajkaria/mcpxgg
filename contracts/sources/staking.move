@@ -11,7 +11,7 @@ use mcpx::admin::PlatformConfig;
 use mcpx::admin;
 use mcpx::events;
 use mcpx::insurance::{Self, InsurancePool};
-use mcpx::quality::OracleCap;
+use mcpx::quality::{Self, OracleCap, QualityAttestation};
 use sui::balance::{Self, Balance};
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
@@ -21,6 +21,14 @@ const E_BELOW_MINIMUM: u64 = 2;
 const E_INSUFFICIENT_STAKE: u64 = 3;
 const E_INVALID_SLA: u64 = 4;
 const E_LOCKED: u64 = 5;
+const E_ATTESTATION_SERVER_MISMATCH: u64 = 6;
+const E_NO_SLA_BREACH: u64 = 7;
+const E_STALE_ATTESTATION: u64 = 8;
+
+/// An attestation older than `freshness = sla_window_seconds × 3` (covering the
+/// oracle's ≥2-window breach rule plus slack) cannot justify a slash — this
+/// stops an OracleCap holder replaying a long-stale breach.
+const SLASH_ATTESTATION_FRESHNESS_WINDOWS: u64 = 3;
 
 public struct ServerStake<phantom T> has key {
     id: UID,
@@ -91,16 +99,38 @@ public fun withdraw<T>(
     transfer::public_transfer(coin, stake.owner);
 }
 
-/// Slash a portion of the stake. Routed to the InsurancePool. Sprint 7
-/// will tighten this to require an `OracleCap` _and_ an attested SLA breach.
+/// Slash a portion of the stake, routed to the `InsurancePool`. Gated on BOTH
+/// an `OracleCap` AND a `QualityAttestation` that on-chain proves the breach:
+///   - the attestation is for *this* stake's server,
+///   - its observed `uptime_x100` is strictly below the committed SLA, and
+///   - it is fresh (attested within `sla_window_seconds × 3` of `clock`),
+/// so a cap holder cannot slash an in-SLA server or replay a stale breach.
+/// The proportional slash *amount* is computed off-chain by the oracle from
+/// the shortfall magnitude; the chain bounds it to the available stake.
 public fun slash<T>(
     _: &OracleCap,
     stake: &mut ServerStake<T>,
     pool: &mut InsurancePool<T>,
+    attestation: &QualityAttestation,
     amount: u64,
     reason: vector<u8>,
     clock: &Clock,
 ) {
+    assert!(
+        quality::server_id(attestation) == stake.server_id,
+        E_ATTESTATION_SERVER_MISMATCH,
+    );
+    assert!(
+        quality::uptime_x100(attestation) < stake.sla_uptime_x100,
+        E_NO_SLA_BREACH,
+    );
+    let now = clock::timestamp_ms(clock);
+    let freshness_ms =
+        stake.sla_window_seconds * SLASH_ATTESTATION_FRESHNESS_WINDOWS * 1_000;
+    assert!(
+        now <= quality::attested_at_ms(attestation) + freshness_ms,
+        E_STALE_ATTESTATION,
+    );
     assert!(balance::value(&stake.stake) >= amount, E_INSUFFICIENT_STAKE);
     let slashed = balance::split(&mut stake.stake, amount);
     insurance::collect(pool, slashed);

@@ -257,19 +257,28 @@ fun e2e_stake_then_downtime_slash_to_insurance() {
         sc.ctx(),
     );
 
+    // Oracle attests the observed breach on-chain (uptime 96.00% < committed
+    // 99.00%) — `slash` requires this proof, not just OracleCap possession.
+    sc.next_tx(ADMIN);
+    quality::attest(
+        &oracle_cap, server_id, 5_500, 9_600, 180, 600, 240, 0, 86_400_000,
+        &clk, sc.ctx(),
+    );
+
     sc.next_tx(DEV);
     let mut stake = sc.take_shared<staking::ServerStake<SUI>>();
+    let attestation = sc.take_shared<quality::QualityAttestation>();
     assert!(object::id(&stake) == stake_id, 0);
     assert!(staking::amount(&stake) == 50_000_000, 1);
     assert!(insurance::balance_value(&insurance_obj) == 0, 2);
 
-    // Oracle observed ≥2 breach windows (uptime 96% vs committed 99%) and
-    // slashes proportionally to the shortfall: ~3.03% of stake ≈ 1_515_000.
+    // Oracle slashes proportionally to the shortfall: ~3.03% ≈ 1_515_000.
     sc.next_tx(ADMIN);
     staking::slash(
         &oracle_cap,
         &mut stake,
         &mut insurance_obj,
+        &attestation,
         1_515_000,
         b"sla_breach: uptime 9600 < committed 9900 for 2 windows",
         &clk,
@@ -280,6 +289,7 @@ fun e2e_stake_then_downtime_slash_to_insurance() {
     assert!(insurance::balance_value(&insurance_obj) == 1_515_000, 5);
 
     ts::return_shared(stake);
+    ts::return_shared(attestation);
     ts::return_shared(server);
     ts::return_shared(insurance_obj);
     ts::return_shared(registry_obj);

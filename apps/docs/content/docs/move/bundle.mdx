@@ -1,0 +1,24 @@
+---
+title: "mcpx::bundle"
+description: Composable server bundles with a per-call price multiplier.
+---
+
+`contracts/sources/bundle.move`
+
+A `Bundle` is a curated list of server IDs with a
+`price_multiplier_x100` (multiplier × 100; `90` = 0.9× = 10% discount)
+applied per-server when called through the bundle.
+
+## Key entry functions
+
+- `create(...)` — publish a bundle over a set of server ids.
+- `deactivate(bundle, ctx)` — creator takes it offline.
+- `activate_for_user(bundle, clock, ctx)` — opt a user into bundle
+  pricing.
+
+## Read accessors
+
+`name`, `creator`, `server_ids`, `price_multiplier_x100`, `is_active`,
+`server_count`.
+
+See the [Bundles concept](/docs/concepts/bundles).

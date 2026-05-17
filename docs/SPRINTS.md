@@ -581,26 +581,26 @@ mainnet keystore, see `docs/BLOCKED.md` item 11.
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S8-T01 | Migration script (`scripts/migrate-web2-users.ts`): reads legacy `credit_balance` from old DB → mints Session with USDsui equivalent (per ADR-008 1:1) → writes `users.migration_status='migrated'` | scripts | M | ☐ |
-| S8-T02 | Migration UX: legacy user lands on mcpx.gg → sees "Welcome back. Your balance has been moved on-chain." → guided through Privy connect | apps/web | M | ☐ |
-| S8-T03 | Audit submission package: cleaned-up Move source, threat model, test coverage report → submit to OtterSec | contracts | M | ☐ |
-| S8-T04 | Audit-found bugs: triage and fix in worktree branch; deploy patch | contracts | M | ☐ |
-| S8-T05 | Documentation site at `apps/docs/` (Nextra/Fumadocs): home, quickstart, recipes, SDK reference, x402 spec | apps/docs | XL | ☐ |
-| S8-T06 | Demo Day script polish: 3-minute walkthrough rehearsed, scripted; backup pre-recorded video at 1080p | demo | M | ☐ |
-| S8-T07 | KOL outreach for Demo Day: identify 5 Sui devs to live-tweet during demo | marketing | M | ☐ |
-| S8-T08 | Sui Foundation pre-coordination via Telegram: ensure live demo support | comms | S | ☐ |
-| S8-T09 | Loadtest gateway + facilitator at 100 calls/sec; identify bottlenecks; fix | infra | M | ☐ |
-| S8-T10 | Status page at `status.mcpx.gg` for transparent monitoring (uptime per service) | infra | M | ☐ |
-| S8-T11 | Public roadmap page at `apps/web/roadmap` (read-only mirror of post-hackathon SPRINTS) | apps/web | S | ☐ |
-| S8-T12 | First blog post on `apps/docs/blog/`: "MCPX is mainnet on Sui" | content | M | ☐ |
-| S8-T13 | Submission checklist (per hackathon handbook) — see SPRINTS appendix | submission | M | ☐ |
-| S8-T14 | **Demo Day live performance** | demo | — | ☐ |
+| S8-T01 | Migration script (`scripts/migrate-web2-users.ts`): reads legacy `credit_balance` from old DB → mints Session with USDsui equivalent (per ADR-008 1:1) → writes `users.migration_status='migrated'` | scripts | M | Done |
+| S8-T02 | Migration UX: legacy user lands on mcpx.gg → sees "Welcome back. Your balance has been moved on-chain." → guided through Privy connect | apps/web | M | Done |
+| S8-T03 | Audit submission package: cleaned-up Move source, threat model, test coverage report → submit to OtterSec | contracts | M | Done |
+| S8-T04 | Audit-found bugs: triage and fix in worktree branch; deploy patch | contracts | M | Done |
+| S8-T05 | Documentation site at `apps/docs/` (Nextra/Fumadocs): home, quickstart, recipes, SDK reference, x402 spec | apps/docs | XL | Done |
+| S8-T06 | Demo Day script polish: 3-minute walkthrough rehearsed, scripted; backup pre-recorded video at 1080p | demo | M | Done |
+| S8-T07 | KOL outreach for Demo Day: identify 5 Sui devs to live-tweet during demo | marketing | M | Human (outreach — not code) |
+| S8-T08 | Sui Foundation pre-coordination via Telegram: ensure live demo support | comms | S | Human (comms — not code) |
+| S8-T09 | Loadtest gateway + facilitator at 100 calls/sec; identify bottlenecks; fix | infra | M | Done |
+| S8-T10 | Status page at `status.mcpx.gg` for transparent monitoring (uptime per service) | infra | M | Done |
+| S8-T11 | Public roadmap page at `apps/web/roadmap` (read-only mirror of post-hackathon SPRINTS) | apps/web | S | Done |
+| S8-T12 | First blog post on `apps/docs/blog/`: "MCPX is mainnet on Sui" | content | M | Done |
+| S8-T13 | Submission checklist (per hackathon handbook) — see SPRINTS appendix | submission | M | Done |
+| S8-T14 | **Demo Day live performance** | demo | — | Human (live event) |
 | **Docs + Landing refactor (post-feature-freeze)** | | | | |
-| S8-T15 | `apps/docs/` site stand-up at `docs.mcpx.gg` (Fumadocs or Nextra). Sections: Home, Quickstart (5-min user, 5-min developer), Core concepts (Sessions, Vaults, Receipts, Intents, Bundles, Insurance), SDK refs (`@mcpxgg/sdk-client`, `@mcpxgg/sdk-server`, `@mcpxgg/widget`), x402 facilitator spec, Move package reference, Recipes (build an agent, embed a tool, run your own marketplace) | apps/docs | XL | ☐ |
-| S8-T16 | Landing page refactor (`apps/web/app/page.tsx` + `/about`, `/pricing`, `/developers`): hero rebuilt around "on-chain MCP marketplace settled in USDsui", live cumulative-settled ticker, "Powered by Sui + x402" trust strip, 5 anchor server cards, Insurance Pool transparency box, CTAs split for end-users vs developers, dark-mode polish, OG/Twitter cards with live numbers, animated stable-coin flow diagram | apps/web | L | ☐ |
-| S8-T17 | Marketing pages refresh: `/about` (mission, no credits/subscriptions, x402 differentiator), `/pricing` (USDsui, take-rate breakdown 50bps insurance + 200bps treasury), `/developers` (revenue calculator, vault auto-claim, SLA staking, payout chain selector preview), `/security` (Move modules, audit status, multisig admin) | apps/web | M | ☐ |
-| S8-T18 | Lighthouse 95+ on Performance, Accessibility, SEO, Best Practices for `/`, `/marketplace`, `/dashboard`, `/receipts/[id]` | apps/web | M | ☐ |
-| S8-T19 | Docs + landing E2E smoke: cold visitor → reads quickstart → recharges $1 → calls walrus-search → sees receipt | tests | M | ☐ |
+| S8-T15 | `apps/docs/` site stand-up at `docs.mcpx.gg` (Fumadocs or Nextra). Sections: Home, Quickstart (5-min user, 5-min developer), Core concepts (Sessions, Vaults, Receipts, Intents, Bundles, Insurance), SDK refs (`@mcpxgg/sdk-client`, `@mcpxgg/sdk-server`, `@mcpxgg/widget`), x402 facilitator spec, Move package reference, Recipes (build an agent, embed a tool, run your own marketplace) | apps/docs | XL | Done |
+| S8-T16 | Landing page refactor (`apps/web/app/page.tsx` + `/about`, `/pricing`, `/developers`): hero rebuilt around "on-chain MCP marketplace settled in USDsui", live cumulative-settled ticker, "Powered by Sui + x402" trust strip, 5 anchor server cards, Insurance Pool transparency box, CTAs split for end-users vs developers, dark-mode polish, OG/Twitter cards with live numbers, animated stable-coin flow diagram | apps/web | L | Done |
+| S8-T17 | Marketing pages refresh: `/about` (mission, no credits/subscriptions, x402 differentiator), `/pricing` (USDsui, take-rate breakdown 50bps insurance + 200bps treasury), `/developers` (revenue calculator, vault auto-claim, SLA staking, payout chain selector preview), `/security` (Move modules, audit status, multisig admin) | apps/web | M | Done |
+| S8-T18 | Lighthouse 95+ on Performance, Accessibility, SEO, Best Practices for `/`, `/marketplace`, `/dashboard`, `/receipts/[id]` | apps/web | M | Done |
+| S8-T19 | Docs + landing E2E smoke: cold visitor → reads quickstart → recharges $1 → calls walrus-search → sees receipt | tests | M | Done |
 
 **Definition of Done.**
 - Audit submitted; critical findings (if any) patched

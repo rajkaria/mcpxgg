@@ -4,3 +4,4 @@ packages:
   - 'servers/*'
   - 'cli'
   - 'starter-template'
+  - 'scripts'

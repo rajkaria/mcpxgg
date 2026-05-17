@@ -1,0 +1,26 @@
+{
+  "name": "@mcpxgg/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Operational scripts: web2→Sui migration (S8-T01), gateway/facilitator loadtest harness (S8-T09), docs+landing smoke (S8-T19), seeders.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'scripts: lint placeholder'",
+    "test": "node --import tsx --test '**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate:web2": "tsx migrate-web2-users.ts",
+    "loadtest": "tsx loadtest/index.ts",
+    "smoke": "tsx smoke/index.ts"
+  },
+  "dependencies": {
+    "@mcpxgg/chain": "workspace:*",
+    "@mcpxgg/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^22",
+    "tsx": "^4.19.0"
+  }
+}

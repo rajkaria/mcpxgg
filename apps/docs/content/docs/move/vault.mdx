@@ -1,0 +1,25 @@
+---
+title: "mcpx::vault"
+description: Developer earnings accrual; owner-gated claim, no payout schedule.
+---
+
+`contracts/sources/vault.move`
+
+A `DeveloperVault<T>` accrues a developer's earnings (default 97.5% of
+every settled call). Shared so settlement can credit it; `claim` is
+owner-gated.
+
+## Key entry functions
+
+- `create<T>(ctx)` — anyone can create their own vault; settlement
+  requires the vault owner to match the server owner.
+- `claim<T>(vault, clock, ctx)` — sweep the entire accrued balance to the
+  owner. Aborts if empty.
+- `set_auto_claim_threshold<T>(...)` — stored for a future auto-compound
+  hook; not yet enforced.
+
+## Read accessors
+
+`owner`, `accrued_balance`, `lifetime_earnings`, `lifetime_claimed`.
+
+See the [Vaults concept](/docs/concepts/vaults).

@@ -1,0 +1,13 @@
+{
+  "title": "Core concepts",
+  "pages": [
+    "sessions",
+    "vaults",
+    "receipts",
+    "intents",
+    "bundles",
+    "insurance",
+    "sla-staking",
+    "streaming"
+  ]
+}

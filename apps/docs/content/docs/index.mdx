@@ -1,0 +1,40 @@
+---
+title: Welcome to MCPX
+description: The Sui-native on-chain marketplace for MCP servers — every tool call settles in USDsui, every receipt is permanent.
+---
+
+**MCPX** is a marketplace, gateway, and x402 facilitator for
+[Model Context Protocol](https://modelcontextprotocol.io) servers, built
+Sui-native. Every tool call settles on-chain in **USDsui** in a single
+atomic transaction; the receipt is a **soulbound on-chain object**; the
+developer is paid straight to a **Sui DeveloperVault** the same block.
+
+No credit cards. No platform tokens. Stablecoin revenue from day one.
+
+## Why it exists
+
+The MCP ecosystem has thousands of servers and no native way to pay for
+them. MCPX makes a paid tool call a first-class on-chain primitive:
+
+- **Atomic settlement.** Debit the user session → credit the dev vault →
+  credit the treasury → credit the insurance pool → mint the receipt. All
+  in one programmable transaction block. If anything fails, nothing moves.
+- **Permanent receipts.** Each `CallReceipt` is `key`-only (no `store`) —
+  it can never be transferred after mint. The output log lives on Walrus,
+  permanently retained.
+- **On-chain economics.** The 2.5% take rate (0.5% insurance + 2.0%
+  treasury) lives in a shared `PlatformConfig` object, mutable only by an
+  admin multisig, hard-capped at 10%.
+- **Multi-chain ready, Sui-only today.** Every chain-touching call goes
+  through one `ChainAdapter`. Adding Base or Solana later is additive.
+
+## Where to go next
+
+<Cards>
+  <Card title="Quickstart — user" href="/docs/quickstart/user" description="Connect, recharge $1, call a tool, see the receipt. 5 minutes." />
+  <Card title="Quickstart — developer" href="/docs/quickstart/developer" description="Publish a server via the CLI and earn to your vault. 5 minutes." />
+  <Card title="Core concepts" href="/docs/concepts/sessions" description="Sessions, Vaults, Receipts, Intents, Bundles, Insurance, Staking, streaming." />
+  <Card title="SDK reference" href="/docs/sdk/client" description="The real, shipped surface of @mcpxgg/sdk, @mcpxgg/server, @mcpxgg/widget." />
+  <Card title="x402 facilitator" href="/docs/x402/spec" description="The exact and upto settlement schemes." />
+  <Card title="Move package" href="/docs/move/overview" description="All 13 on-chain modules, with key entry functions." />
+</Cards>

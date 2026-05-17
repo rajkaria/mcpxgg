@@ -1,0 +1,22 @@
+---
+title: "mcpx::treasury"
+description: Platform treasury share; AdminCap-gated withdrawal.
+---
+
+`contracts/sources/treasury.move`
+
+`PlatformTreasury<T>` receives the treasury share of every settled call
+(default 200 bps of the 250 bps take rate, ADR-004). Generic over the
+coin type so unit tests can use mock coins. Withdrawals require the same
+multisig-held `AdminCap` that mutates `PlatformConfig` — the take-rate
+setter and the treasury withdrawer share one governance boundary.
+
+## Key entry functions
+
+- `initialize<T>(&AdminCap, ctx)` — create a per-coin treasury (not in
+  `init` because Move's `init` is monomorphic).
+- `withdraw<T>(...)` — `AdminCap`-gated withdrawal.
+
+## Read accessors
+
+`balance_value`, `lifetime_collected`, `lifetime_withdrawn`.

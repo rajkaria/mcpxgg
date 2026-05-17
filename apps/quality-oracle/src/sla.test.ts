@@ -160,6 +160,13 @@ function fixedStakeStore(stakes: StakedServer[]): StakeStore {
   return { async listActiveStakes() { return stakes; } };
 }
 
+/** A fresh-attestation map proving the breach for '0xsrv' (the default stake). */
+function attMap(
+  entries: Record<string, string> = { '0xsrv': '0xatt-0xsrv' },
+): Map<string, string> {
+  return new Map(Object.entries(entries));
+}
+
 const W0 = 0;
 const W1 = WINDOW_MS;
 
@@ -178,6 +185,7 @@ describe('runSlaSlashing', () => {
       samples,
       W0,
       W1,
+      attMap(),
     );
     assert.equal(r.inBreach, 1);
     assert.equal(r.slashesSubmitted, 0);
@@ -199,11 +207,14 @@ describe('runSlaSlashing', () => {
       samples,
       W0,
       W1,
+      attMap(),
     );
     assert.equal(r.slashesSubmitted, 1);
     assert.equal(chain.calls[0]?.stakeObjectId, '0xstake');
     // full outage vs 9900 → shortfall 1 → entire remaining 500_000.
     assert.equal(chain.calls[0]?.amountAtomic, 500_000n);
+    // The proving attestation id is threaded into the slash PTB.
+    assert.equal(chain.calls[0]?.attestationObjectId, '0xatt-0xsrv');
     assert.equal(r.slashedAtomicTotal, 500_000n);
   });
 
@@ -220,6 +231,7 @@ describe('runSlaSlashing', () => {
       [{ serverObjectId: '0xsrv', status: 'error', latencyMs: 5 }],
       W0,
       W1,
+      attMap(),
     );
     assert.equal(streaks.map.get('0xstake'), 1);
 
@@ -231,6 +243,7 @@ describe('runSlaSlashing', () => {
       [{ serverObjectId: '0xsrv', status: 'success', latencyMs: 5 }],
       W1,
       W1 + WINDOW_MS,
+      attMap(),
     );
     assert.equal(streaks.map.get('0xstake'), 0);
     assert.equal(chain.calls.length, 0);
@@ -247,6 +260,7 @@ describe('runSlaSlashing', () => {
       [], // no calls for this server this window
       W0,
       W1,
+      attMap(),
     );
     assert.equal(streaks.map.get('0xstake'), 1);
     assert.equal(chain.calls.length, 0);
@@ -267,6 +281,7 @@ describe('runSlaSlashing', () => {
       [{ serverObjectId: '0xsrv', status: 'error', latencyMs: 5 }],
       W0,
       W1,
+      attMap(),
     );
     assert.equal(r.slashesSubmitted, 0);
     assert.equal(r.failures.length, 1);
@@ -286,10 +301,54 @@ describe('runSlaSlashing', () => {
       [{ serverObjectId: '0xsrv', status: 'error', latencyMs: 5 }],
       W0,
       W1,
+      attMap(),
     );
     // 0n remaining stakes are filtered by the store in prod; here we pass one
     // explicitly and assert the orchestrator is still safe.
     assert.equal(r.slashesSubmitted, 0);
     assert.equal(chain.calls.length, 0);
+  });
+
+  it('skips the slash and preserves the streak when no fresh attestation proves the breach', async () => {
+    const chain = recordingSlashChain();
+    const streaks = memStreakStore();
+    streaks.map.set('0xstake', 1); // 2nd consecutive breach this window
+    const r = await runSlaSlashing(
+      fixedStakeStore([stake()]),
+      streaks,
+      chain,
+      [{ serverObjectId: '0xsrv', status: 'error', latencyMs: 5 }],
+      W0,
+      W1,
+      // No attestation for '0xsrv' this tick (attest failed/absent).
+      new Map<string, string>(),
+    );
+    assert.equal(r.slashesSubmitted, 0);
+    assert.equal(r.skippedNoAttestation, 1);
+    assert.equal(chain.calls.length, 0);
+    assert.equal(r.failures.length, 1);
+    assert.match(r.failures[0]!.error, /no fresh QualityAttestation/);
+    // Streak preserved at the slash threshold so it retries next window once
+    // an attestation exists (mirrors failed-slash semantics).
+    assert.equal(streaks.map.get('0xstake'), 2);
+  });
+
+  it('slashes with the right attestation id when the proof IS present', async () => {
+    const chain = recordingSlashChain();
+    const streaks = memStreakStore();
+    streaks.map.set('0xstake', 1);
+    const r = await runSlaSlashing(
+      fixedStakeStore([stake({ remainingStakeAtomic: 750_000n })]),
+      streaks,
+      chain,
+      [{ serverObjectId: '0xsrv', status: 'error', latencyMs: 5 }],
+      W0,
+      W1,
+      attMap({ '0xsrv': '0xPROOF' }),
+    );
+    assert.equal(r.slashesSubmitted, 1);
+    assert.equal(r.skippedNoAttestation, 0);
+    assert.equal(chain.calls[0]?.attestationObjectId, '0xPROOF');
+    assert.equal(chain.calls[0]?.amountAtomic, 750_000n);
   });
 });

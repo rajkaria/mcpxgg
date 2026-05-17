@@ -1,0 +1,23 @@
+---
+title: "mcpx::insurance"
+description: Insurance pool — outage and failed-call payouts, funded by 0.5% of every call.
+---
+
+`contracts/sources/insurance.move`
+
+`InsurancePool<T>` receives the insurance share (default 0.5%,
+configurable). Two caps: `AdminCap` (top-up / emergency drain) and
+`InsurancePayerCap` (minted by the admin to oracle addresses for routine
+payouts without admin sign-off).
+
+## Key entry functions
+
+- `initialize<T>(&AdminCap, ctx)` — create a per-coin pool.
+- `mint_payer_cap(&AdminCap, recipient, ctx)` — grant payout authority.
+- `top_up<T>(pool, contribution)` — anyone can donate.
+- `pay_out<T>(...)` — routine outage payout (`InsurancePayerCap`-gated).
+
+Failed-call refunds flow from `settlement::claim_for_failed_call`, proven
+by a soulbound receipt and pre-capped to the pool balance.
+
+See the [Insurance concept](/docs/concepts/insurance).

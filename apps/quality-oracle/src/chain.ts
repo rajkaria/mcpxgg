@@ -44,7 +44,9 @@ export async function createChainClient(cfg: ChainClientConfig): Promise<Quality
   const sender = await addressFromPrivateKey(cfg.oraclePrivateKey);
 
   return {
-    async attest(input: AttestInput): Promise<{ digest: string }> {
+    async attest(
+      input: AttestInput,
+    ): Promise<{ digest: string; attestationObjectId: string | null }> {
       const built = await buildAttestQualityTx({
         cfg: { packageId: cfg.packageId, rpcUrl: cfg.rpcUrl },
         sender,
@@ -63,7 +65,16 @@ export async function createChainClient(cfg: ChainClientConfig): Promise<Quality
         privateKey: cfg.oraclePrivateKey,
         rpcUrl: cfg.rpcUrl,
       });
-      return { digest: res.digest };
+      // `mcpx::quality::attest` shares a `QualityAttestation`; its created
+      // object's type ends in `::quality::QualityAttestation`. The slash pass
+      // needs this id to prove the breach on-chain (security hardening).
+      const att = res.created.find((c) =>
+        c.objectType.endsWith('::quality::QualityAttestation'),
+      );
+      return {
+        digest: res.digest,
+        attestationObjectId: att ? att.objectId : null,
+      };
     },
   };
 }
@@ -95,6 +106,7 @@ export async function createSlashChainClient(
         oracleCapId: cfg.oracleCapId,
         stakeObjectId: input.stakeObjectId,
         insurancePoolId: cfg.insurancePoolId,
+        attestationObjectId: input.attestationObjectId,
         amountAtomic: input.amountAtomic,
         reason: input.reason,
       });

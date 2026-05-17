@@ -1,0 +1,98 @@
+---
+title: x402 facilitator spec
+description: The exact and upto settlement schemes — wire format, verify/settle/supported flow, Sui-native.
+---
+
+MCPX speaks **x402** (`X402_VERSION = "0.1.0"`). The facilitator is the
+only component that signs settlement transactions — the gateway never
+signs directly. Types and the `FacilitatorClient` live in
+`@mcpxgg/x402` (`packages/x402`); the service is `apps/facilitator`.
+
+## Schemes & networks
+
+```ts
+ALL_SCHEMES  = ['exact', 'upto']
+type Scheme  = 'exact' | 'upto'
+ALL_NETWORKS // Sui networks (mainnet/testnet)
+```
+
+- **`exact`** — the buyer signs the exact `amountAtomic`; that exact
+  amount is debited.
+- **`upto`** — the buyer signs a *ceiling* (`amountAtomic`). The
+  facilitator meters the real usage and settles
+  `0 ≤ settled ≤ ceiling`. The contract enforces this on-chain via
+  `settle_call_upto`. The unused remainder is never debited — an implicit
+  refund.
+
+## `PaymentDetails` (the quote)
+
+```ts
+interface PaymentDetails {
+  scheme: Scheme;
+  network: Network;
+  serverObjectId: string;   // registry::Server object id
+  toolName: string;         // e.g. "query"
+  amountAtomic: bigint;     // exact price, or the upto ceiling. String on wire.
+  tokenType: string;        // USDsui type tag, e.g. "0x..::usdsui::USDSUI"
+  validUntilMs: number;     // quote expiry
+  metadata?: Record<string, unknown>;
+}
+```
+
+`amountAtomic` is a `bigint` in code and a **decimal string on the wire**
+(use `detailsToWire` / `detailsFromWire` from `@mcpxgg/x402`).
+
+## `PaymentPayload` (what the buyer signs)
+
+```ts
+interface PaymentPayload {
+  signature: string;        // over canonical JSON of PaymentDetails
+  payerAddress: string;
+  sessionObjectId: string;  // session being debited
+  intentId?: string;        // optional spending-intent id
+  details: PaymentDetails;  // echo of the signed quote
+}
+```
+
+## Endpoints
+
+| Endpoint     | Purpose                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `/verify`    | Validates a `PaymentPayload` → `VerifyResult`. Invalid reasons include `unsupported_scheme`, `unsupported_network`, expired quote, bad signature. |
+| `/settle`    | Builds and submits the atomic settlement PTB → `SettleResult`.          |
+| `/supported` | `SupportedResult` — supported schemes, networks, the USDsui token type, and `x402Version`. |
+
+## `SettleResult`
+
+```ts
+interface SettleResult {
+  // ...
+  settledAmountAtomic?: bigint;  // actually debited (≤ amountAtomic in upto)
+  quotedMaxAtomic?: bigint;      // upto only — the signed ceiling
+  unusedAtomic?: bigint;         // upto only — quotedMax − settled, never debited
+}
+```
+
+## The `upto` settle-time supplement
+
+`exact` debits the signed `amountAtomic`. `upto` requires the facilitator
+to declare the metered amount at settle time:
+
+```ts
+interface UptoSettleExtra {
+  // metered amount to actually debit; MUST be ≤ the signed amountAtomic
+  // ...
+}
+```
+
+The contract (`settlement::settle_call_upto`) enforces
+`0 ≤ actual ≤ quotedMax` on-chain, so a misbehaving facilitator cannot
+over-charge a buyer beyond the signed ceiling. Use
+`uptoSettleExtraToWire` / `parseUptoSettleExtra` for the wire codec.
+
+## Client
+
+`FacilitatorClient` (with `FacilitatorClientOptions`) wraps the three
+endpoints; `FacilitatorHttpError` is thrown on non-2xx. All `bigint`
+fields are encoded as decimal strings via the `*ToWire` / `*FromWire`
+helpers — never send a JS `bigint` over JSON directly.

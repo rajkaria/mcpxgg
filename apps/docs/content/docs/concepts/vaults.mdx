@@ -1,0 +1,28 @@
+---
+title: Vaults
+description: Where developer earnings accrue — owner-gated, claimable any time, no payout schedule.
+---
+
+A **DeveloperVault** accrues a developer's earnings — by default 97.5% of
+every settled call against one of their tools (the dev share after the
+2.5% take rate). It is a *shared* object so settlement can credit it
+without an owned reference, but `claim` is owner-gated.
+
+Move module: `mcpx::vault` (`contracts/sources/vault.move`).
+
+## Key entry functions
+
+- `create<T>(ctx)` — anyone can create their own vault. Settlement
+  requires the vault owner to match the server owner.
+- `claim<T>(vault, clock, ctx)` — sweeps the **entire** accrued balance to
+  the owner. Aborts if empty, so you never waste gas on a no-op claim.
+- `set_auto_claim_threshold<T>(...)` — stores a threshold for a future
+  auto-compound hook (Cetus / Scallop). Stored, not yet enforced.
+
+## Read accessors
+
+`accrued_balance`, `lifetime_earnings`, `lifetime_claimed`, `owner`.
+
+There is **no payout schedule, no minimum, no holding period**. The
+moment a call settles, the dev share is in your vault on-chain. You decide
+when to claim.

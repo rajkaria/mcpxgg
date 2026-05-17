@@ -1,0 +1,20 @@
+---
+title: "mcpx::events"
+description: Typed events for every state transition — how the indexer hydrates Postgres.
+---
+
+`contracts/sources/events.move`
+
+Every state transition emits a typed event so the indexer can hydrate
+Postgres views (ADR-011: Postgres is a **mirror**, the chain owns state).
+All event structs are `copy + drop`. Other mcpx modules emit through
+`public(package)` helpers; external packages cannot forge events.
+
+Notable events include `CallSettled` (emitted by `settle_call`) and
+`UptoSettled` (emitted by `settle_call_upto`, carrying the quoted ceiling
+vs. the metered amount so indexers can show the implicit refund delta),
+plus registry/session/intent/quality lifecycle events.
+
+The indexer subscribes to these and writes the read-fast Postgres views
+the UI queries. Reads go to Postgres; writes always sign a Move tx —
+never write a mirror table from a route handler.

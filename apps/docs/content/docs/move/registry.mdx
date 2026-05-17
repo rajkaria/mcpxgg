@@ -1,0 +1,28 @@
+---
+title: "mcpx::registry"
+description: The canonical on-chain catalog of MCP servers and their tools.
+---
+
+`contracts/sources/registry.move`
+
+The canonical on-chain catalog. Each `Server` is a shared object so the
+gateway can read pricing without an owned reference. Mutations require the
+matching `ServerOwnerCap` (transferred to the publisher at creation).
+Namespaces are unique per-chain via the shared `NamespaceRegistry` —
+`publish_server` aborts if the namespace is taken.
+
+## Key entry functions
+
+- `publish_server(...)` — publish a server with no tools. `add_tool` can
+  be called in the same PTB, so "publish + add 3 tools" is atomic.
+- `update_metadata(...)` — change endpoint/description (cap-gated).
+- `add_tool(...)` — register a tool with its `priceAtomic`.
+- `remove_tool(...)` — remove a tool.
+- `update_tool_price(...)` — change a tool's per-call price.
+- `deactivate(...)` — take a server offline.
+
+## Read accessors
+
+`namespace`, `endpoint_url`, `version`, `tool_count`, `has_tool`,
+`tool_price_atomic`, `cap_server_id`, `namespace_taken`,
+`namespace_server_id`.

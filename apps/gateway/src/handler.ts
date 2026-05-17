@@ -226,9 +226,13 @@ async function handleToolsCall(
     return ok(id, makeToolErrorContent(code as GatewayError['code'], message));
   }
 
-  // Success path. Archive request/response to Walrus (permanent).
-  const blobId = await archiveCall(deps.walrus, {
-    v: 1,
+  // Success path. The Walrus archive is a network round-trip; keep it OFF the
+  // response hot path whenever settlement isn't synchronous (S8-T09). Only the
+  // synchronous-settle branch must await it, because that receipt is minted
+  // in-band and wants the blob id; the async-settle path archives-then-settles
+  // in the deferred task so the on-chain receipt still references the blob.
+  const archivePayload = {
+    v: 1 as const,
     namespace,
     toolName,
     userId: auth.userId,
@@ -236,37 +240,49 @@ async function handleToolsCall(
     ts: now(),
     request: { arguments: args },
     response: { content: exec.content, isError: exec.isError },
-  });
-  if (!blobId) {
-    deps.logger.warn({ requestId, tool: fullName }, 'gateway: walrus archive failed');
-  }
+  };
 
+  let blobId: string | null = null;
   let settlement: 'settled' | 'pending' | 'free' = 'free';
   let txDigest: string | undefined;
   let receiptObjectId: string | undefined;
 
   if (isFree) {
+    // Free-tier calls still get a permanent Walrus log, but nothing waits on
+    // it — there is no receipt or settlement that needs the blob id.
+    void archiveCall(deps.walrus, archivePayload).then((b) => {
+      if (!b) deps.logger.warn({ requestId, tool: fullName }, 'gateway: walrus archive failed');
+    });
     await deps.cache.setJSON(ftKey, used + 1, FREE_TIER_TTL_SECONDS);
   } else if (deps.env.settleAsync) {
     settlement = 'pending';
-    void settle(deps.env, deps.facilitator, deps.signer, {
-      auth,
-      server,
-      tool,
-      chargeAtomic,
-      success: !exec.isError,
-      ...(blobId ? { receiptBlobId: blobId } : {}),
-      ...intentSettle,
-      nowMs: now(),
-    }).then((o) => {
+    void (async () => {
+      const b = await archiveCall(deps.walrus, archivePayload);
+      if (!b) {
+        deps.logger.warn({ requestId, tool: fullName }, 'gateway: walrus archive failed');
+      }
+      const o = await settle(deps.env, deps.facilitator, deps.signer, {
+        auth,
+        server,
+        tool,
+        chargeAtomic,
+        success: !exec.isError,
+        ...(b ? { receiptBlobId: b } : {}),
+        ...intentSettle,
+        nowMs: now(),
+      });
       if (!o.settled) {
         deps.logger.error(
           { requestId, tool: fullName, error: o.error },
           'gateway: async settlement failed',
         );
       }
-    });
+    })();
   } else {
+    blobId = await archiveCall(deps.walrus, archivePayload);
+    if (!blobId) {
+      deps.logger.warn({ requestId, tool: fullName }, 'gateway: walrus archive failed');
+    }
     const outcome = await settle(deps.env, deps.facilitator, deps.signer, {
       auth,
       server,

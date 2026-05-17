@@ -8,6 +8,12 @@ import type { Database } from "@/lib/supabase/types";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
+// S8-T18: authenticated surface — keep it out of the index.
+export const metadata = {
+  title: "Dashboard",
+  robots: { index: false, follow: false },
+};
+
 export default async function DashboardLayout({
   children,
 }: {

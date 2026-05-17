@@ -1,0 +1,32 @@
+---
+title: SLA staking
+description: Developers lock USDsui collateral against a stated SLA; oracle-attested breaches are slashed to the insurance pool.
+---
+
+**SLA staking** lets a developer lock USDsui as collateral against a
+stated SLA tier (uptime + window). If the quality oracle observes a
+breach, an `OracleCap` holder can slash a portion of the stake, routing
+it to the [Insurance pool](/docs/concepts/insurance). Skin in the game,
+on-chain.
+
+Move module: `mcpx::staking` (`contracts/sources/staking.move`).
+
+## Shape
+
+- `owner`, `server_id` — who staked, on which server.
+- `sla_uptime_x100` — pledged uptime, ×100 (e.g. `9950` = 99.50%).
+- `sla_window_seconds` — the measurement window.
+- A `lock_until` timestamp so a developer cannot bail right before an
+  attestation lands.
+
+## Key entry functions
+
+- `post<T>(...)` — lock collateral against an SLA tier.
+- `top_up<T>(stake, deposit, ctx)` — add more collateral.
+- `withdraw<T>(...)` — pull stake back after the lock expires.
+- `slash<T>(...)` — slash a portion to the insurance pool on an attested
+  breach (oracle-gated).
+
+The slashing predicate is fed by the **quality oracle**, which mints
+`QualityAttestation` objects (uptime, p95 latency, error rate, composite
+score). See the [quality module reference](/docs/move/quality).

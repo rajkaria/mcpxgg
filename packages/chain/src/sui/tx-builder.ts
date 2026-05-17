@@ -552,6 +552,12 @@ export async function buildSlashStakeTx(args: {
   oracleCapId: string;
   stakeObjectId: string;
   insurancePoolId: string;
+  /**
+   * Shared `QualityAttestation` object id that on-chain proves the breach
+   * (same server, uptime below committed SLA, fresh). `staking::slash` aborts
+   * without it — an OracleCap alone can no longer slash.
+   */
+  attestationObjectId: string;
   amountAtomic: bigint;
   reason: string;
 }): Promise<BuiltTx> {
@@ -567,6 +573,7 @@ export async function buildSlashStakeTx(args: {
       tx.object(args.oracleCapId),
       tx.object(args.stakeObjectId),
       tx.object(args.insurancePoolId),
+      tx.object(args.attestationObjectId),
       tx.pure.u64(args.amountAtomic),
       tx.pure.vector('u8', enc(args.reason)),
       tx.object('0x6'), // Clock

@@ -1,0 +1,44 @@
+---
+title: Sessions
+description: Pre-funded escrow the settlement contract debits per call, with caps, scope, and expiry.
+---
+
+A **Session** is a pre-funded escrow object that the settlement module
+debits once per call. It is a Sui *shared* object so the gateway and
+facilitator can include it in a settlement PTB without owning a reference;
+user-only operations (`deposit`, `withdraw`, `close`) are gated by
+`ctx.sender() == session.owner`.
+
+Move module: `mcpx::session` (`contracts/sources/session.move`).
+
+## Caps and scope
+
+Each `Session<T>` carries optional guardrails. The convention: **zero
+means unlimited**.
+
+| Field                  | Zero value means         |
+| ---------------------- | ------------------------ |
+| `per_call_cap_atomic`  | unlimited per call       |
+| `per_day_cap_atomic`   | unlimited per day        |
+| `expires_at_ms`        | no expiry                |
+| `scoped_server_ids`    | (empty) any server       |
+
+Day windows roll at UTC midnight of the gateway-observed clock
+(`clock::timestamp_ms / 86_400_000`) — good enough for rate-limiting, not
+fiscal precision.
+
+## Key entry functions
+
+- `create<T>(...)` — open a session, optionally pre-funded and capped.
+- `deposit<T>(session, coin, ...)` — top up (this is what **Recharge**
+  calls).
+- `withdraw<T>(session, amount, ...)` — owner pulls funds back out.
+
+## SessionKey
+
+A `SessionKey` capability (`key + store`) authorizes off-chain calls on
+behalf of the session. The gateway derives an HMAC API key
+(`mcpx_sk_…`) bound to a `SessionKey`; the `access` module can narrow
+this to a `ScopedKey` over specific servers (see
+[Receipts](/docs/concepts/receipts) and the
+[Move reference](/docs/move/access)).

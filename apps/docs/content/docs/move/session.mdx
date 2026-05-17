@@ -1,0 +1,27 @@
+---
+title: "mcpx::session"
+description: Pre-funded escrow debited per call; caps, scope, expiry.
+---
+
+`contracts/sources/session.move`
+
+A `Session<T>` is a pre-funded escrow shared object the settlement module
+debits per call. User-only operations are gated by
+`ctx.sender() == session.owner`. Convention: a zero cap means unlimited
+(`per_call_cap_atomic`, `per_day_cap_atomic`, `expires_at_ms`; empty
+`scoped_server_ids` = any server). Day windows roll at UTC midnight of the
+gateway-observed clock.
+
+## Key entry functions
+
+- `create<T>(...)` — open a session, optionally pre-funded and capped.
+- `deposit<T>(session, coin, ...)` — top up (the **Recharge** path).
+- `withdraw<T>(session, amount, ...)` — owner pulls funds back.
+
+## SessionKey
+
+`SessionKey` (`key + store`) authorizes off-chain calls for the session;
+the gateway derives an HMAC API key bound to it. See
+[`mcpx::access`](/docs/move/access) for scoped narrowing.
+
+See also the [Sessions concept](/docs/concepts/sessions).

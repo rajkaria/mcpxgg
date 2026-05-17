@@ -23,6 +23,12 @@ function isSealEnvelope(v: unknown): v is SealEnvelope {
   );
 }
 
+// S8-T18: receipts are per-user private data — never index them.
+export const metadata = {
+  title: "Receipt",
+  robots: { index: false, follow: false },
+};
+
 export default async function ReceiptPage({
   params,
 }: {

@@ -1,0 +1,19 @@
+{
+  "title": "Move package",
+  "pages": [
+    "overview",
+    "registry",
+    "session",
+    "settlement",
+    "vault",
+    "treasury",
+    "insurance",
+    "admin",
+    "access",
+    "intent",
+    "bundle",
+    "quality",
+    "staking",
+    "events"
+  ]
+}

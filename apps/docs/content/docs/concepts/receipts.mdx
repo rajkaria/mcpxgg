@@ -1,0 +1,40 @@
+---
+title: Receipts
+description: Soulbound, permanent, on-chain proof of every settled call.
+---
+
+Every settled call mints a **`CallReceipt`** for the payer. It is
+`key`-only — **no `store` ability** — so it can never be transferred
+after creation. This is deliberate (ADR-005): receipts are permanent and
+composable with future trust primitives.
+
+Minted inside `mcpx::settlement` (`contracts/sources/settlement.move`).
+
+## What a receipt records
+
+Read accessors on `CallReceipt`:
+
+| Accessor                  | Meaning                                      |
+| ------------------------- | -------------------------------------------- |
+| `receipt_payer`           | the paying address                           |
+| `receipt_server_id`       | the server called                            |
+| `receipt_session_id`      | the session debited                          |
+| `receipt_amount`          | total atomic charged                         |
+| `receipt_dev_share`       | atomic credited to the DeveloperVault        |
+| `receipt_treasury_share`  | atomic credited to the PlatformTreasury      |
+| `receipt_insurance_share` | atomic credited to the InsurancePool         |
+| `receipt_success`         | did the upstream tool succeed                |
+| `receipt_refunded`        | has a failed-call claim been paid            |
+| `receipt_log_blob_id`     | Walrus blob id of the permanent call log     |
+| `receipt_tool_name`       | the tool that was called                     |
+| `receipt_settled_at_ms`   | settlement timestamp                          |
+
+## Failed calls
+
+If the upstream tool failed (`success == false`) and the call has not been
+refunded, the payer can recover the spend via
+`settlement::claim_for_failed_call`, which proves the claim is backed by a
+soulbound receipt and pays it from the [Insurance pool](/docs/concepts/insurance).
+
+The output log itself lives on **Walrus** with permanent retention and is
+referenced by `receipt_log_blob_id`.

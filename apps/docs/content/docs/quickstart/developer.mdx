@@ -1,0 +1,79 @@
+---
+title: Developer quickstart (5 min)
+description: Publish an MCP server with @mcpxgg/cli and start earning USDsui to your DeveloperVault.
+---
+
+This path takes you from a local MCP server to a published, earning
+marketplace listing in about five minutes.
+
+## 1. Build a server (≈2 min)
+
+Install the server SDK and define a tool. Pricing is always a `bigint` in
+USDsui atomic units (6 decimals) — never a credit integer.
+
+```ts
+import { createMCPXServer } from '@mcpxgg/server';
+
+const server = createMCPXServer({ namespace: 'my-server' });
+
+server.tool('analyze', {
+  description: 'Analyze something',
+  inputSchema: {
+    type: 'object',
+    properties: { query: { type: 'string' } },
+  },
+  pricing: { perCallAtomic: 5_000n }, // 0.005 USDsui
+  handler: async (args, ctx) => {
+    // ctx.payerAddress / ctx.txDigest are populated post-settlement.
+    return { result: `analyzed ${args.query}` };
+  },
+});
+
+server.listen(3000);
+```
+
+See the [`@mcpxgg/server` reference](/docs/sdk/server) for the full
+`ToolDefinition`, `ToolContext`, and streaming API.
+
+## 2. Describe it (`mcpx.config.json`) (≈1 min)
+
+Create an `mcpx.config.json` describing the server, its tools, and their
+`priceAtomic`. The full schema (including `freeTierCallsPerUser`) is in
+the [config schema reference](/docs/recipes/run-your-own-marketplace).
+
+## 3. Publish via the CLI (≈1 min)
+
+```bash
+pnpm dlx @mcpxgg/cli publish
+```
+
+The CLI signs a Sui transaction that calls `registry::publish_server`
+(plus `registry::add_tool` for each tool, in the same PTB — publish is
+atomic). Your **namespace** is reserved on-chain in the shared
+`NamespaceRegistry`; publishing aborts if the namespace is taken. You
+receive a `ServerOwnerCap` — the capability required to update metadata,
+add/remove tools, or change prices later.
+
+## 4. Earn to your vault (≈1 min)
+
+Create a `DeveloperVault` (`vault::create`) — or the CLI does it for you.
+From then on, every settled call against one of your tools credits your
+vault its **dev share** (default 97.5% of the call price) in the *same*
+atomic transaction that debits the user.
+
+Withdraw any time:
+
+```bash
+pnpm dlx @mcpxgg/cli vault claim
+```
+
+This calls `vault::claim`, sweeping the full accrued balance to your
+address. There is no payout schedule, no minimum, no platform holding
+period — the money is already yours on-chain the moment the call settles.
+
+## Next
+
+- Stake on an SLA tier with [SLA Staking](/docs/concepts/sla-staking) to
+  rank higher and signal reliability.
+- [Run your own marketplace](/docs/recipes/run-your-own-marketplace) — the
+  whole stack is open.

@@ -147,7 +147,10 @@ describe('runQualityOracle', () => {
     const chain: QualityChainClient = {
       async attest(input) {
         calls.push(input);
-        return { digest: `0xd${calls.length}` };
+        return {
+          digest: `0xd${calls.length}`,
+          attestationObjectId: `0xatt${calls.length}`,
+        };
       },
     };
     const res = await runQualityOracle(store, chain, W_START, W_END);
@@ -158,6 +161,30 @@ describe('runQualityOracle', () => {
     assert.equal(calls[0]?.serverObjectId, '0xa');
     assert.equal(calls[0]?.windowStartMs, W_START);
     assert.equal(calls[0]?.uptimeX100, 10_000);
+    // The created QualityAttestation ids are surfaced for the slash pass.
+    assert.equal(res.attestationsByServer.get('0xa'), '0xatt1');
+    assert.equal(res.attestationsByServer.get('0xb'), '0xatt2');
+  });
+
+  it('omits servers whose attest returned no created attestation id', async () => {
+    const store: QualityStore = {
+      async getCallSamples() {
+        return [sample('0xa', 'success', 1), sample('0xb', 'success', 1)];
+      },
+    };
+    const chain: QualityChainClient = {
+      async attest(input) {
+        return {
+          digest: '0xd',
+          attestationObjectId:
+            input.serverObjectId === '0xa' ? '0xattA' : null,
+        };
+      },
+    };
+    const res = await runQualityOracle(store, chain, W_START, W_END);
+    assert.equal(res.attestationsSubmitted, 2);
+    assert.equal(res.attestationsByServer.get('0xa'), '0xattA');
+    assert.equal(res.attestationsByServer.has('0xb'), false);
   });
 
   it('collects per-server attest failures without aborting the rest', async () => {
@@ -169,7 +196,7 @@ describe('runQualityOracle', () => {
     const chain: QualityChainClient = {
       async attest(input) {
         if (input.serverObjectId === '0xbad') throw new Error('rpc down');
-        return { digest: '0xok' };
+        return { digest: '0xok', attestationObjectId: '0xok-att' };
       },
     };
     const res = await runQualityOracle(store, chain, W_START, W_END);
@@ -188,7 +215,7 @@ describe('runQualityOracle', () => {
     const chain: QualityChainClient = {
       async attest() {
         attested = true;
-        return { digest: '0x' };
+        return { digest: '0x', attestationObjectId: '0xatt' };
       },
     };
     const res = await runQualityOracle(store, chain, W_START, W_END);

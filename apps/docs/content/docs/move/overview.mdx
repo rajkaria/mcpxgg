@@ -1,0 +1,41 @@
+---
+title: Move package overview
+description: The 13 on-chain modules under the mcpx package, and how they fit together.
+---
+
+The on-chain logic is a single Sui Move package, `mcpx`
+(`contracts/sources/`). Postgres is only an indexer mirror — the chain
+owns state (ADR-011). There are **13 modules**:
+
+| Module                                  | Purpose                                                              |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| [`registry`](/docs/move/registry)       | Canonical on-chain catalog of servers + tools; unique namespaces.    |
+| [`session`](/docs/move/session)         | Pre-funded escrow debited per call; caps, scope, expiry.             |
+| [`settlement`](/docs/move/settlement)   | The atomic PTB: debit → split → credit → mint receipt → emit.        |
+| [`vault`](/docs/move/vault)             | Developer earnings accrual; owner-gated claim.                       |
+| [`treasury`](/docs/move/treasury)       | Platform treasury share; `AdminCap`-gated withdrawal.                |
+| [`insurance`](/docs/move/insurance)     | Insurance pool; outage & failed-call payouts.                        |
+| [`admin`](/docs/move/admin)             | `PlatformConfig` + `AdminCap`; on-chain economic knobs.              |
+| [`access`](/docs/move/access)           | Scoped access keys (API-key ↔ on-chain scope binding).               |
+| [`intent`](/docs/move/intent)           | Agent spending intents — delegated capped budgets.                   |
+| [`bundle`](/docs/move/bundle)           | Composable server bundles with a price multiplier.                   |
+| [`quality`](/docs/move/quality)         | Oracle quality attestations (uptime, latency, error rate).           |
+| [`staking`](/docs/move/staking)         | SLA staking with oracle-attested slashing.                           |
+| [`events`](/docs/move/events)           | Typed events for every state transition (indexer hydration).         |
+
+## The atomic settlement, in one sentence
+
+The facilitator builds one PTB calling `settlement::settle_call` which —
+all-or-nothing — debits the user's `Session`, splits the amount into
+insurance / treasury / dev shares per `PlatformConfig`, credits the
+`InsurancePool`, `PlatformTreasury`, and `DeveloperVault`, mints a
+soulbound `CallReceipt`, and emits `CallSettled`.
+
+## Capability model
+
+Every privileged action is gated by a capability object, not an address
+allowlist: `AdminCap` (platform config + treasury), `ServerOwnerCap`
+(per-server mutations), `SessionKey` (off-chain call authorization),
+`OracleCap` (quality attestations + slashing), `InsurancePayerCap`
+(routine payouts). Caps are `key + store` where they need to be held by a
+multisig.

@@ -171,20 +171,29 @@ fun staking_post_and_slash_distributes_to_insurance() {
         sc.ctx(),
     );
 
+    // Oracle attests a breach (96.00% < committed 99.00%) for this server.
+    quality::attest(
+        &oracle_cap, server_id, 6_000, 9_600, 120, 400, 50, 0, 1_000, &clk, sc.ctx(),
+    );
+
     sc.next_tx(DEV);
     {
         let mut stake = sc.take_shared<staking::ServerStake<SUI>>();
+        let attestation = sc.take_shared<quality::QualityAttestation>();
         assert!(object::id(&stake) == stake_id, 0);
         assert!(staking::amount(&stake) == 50_000_000, 1);
         assert!(staking::owner(&stake) == DEV, 2);
         assert!(staking::sla_uptime_x100(&stake) == 9_900, 3);
 
-        // Oracle slashes 10%
-        staking::slash(&oracle_cap, &mut stake, &mut pool, 5_000_000, b"sla_breach", &clk);
+        // Oracle slashes 10%, proven by the attested breach.
+        staking::slash(
+            &oracle_cap, &mut stake, &mut pool, &attestation, 5_000_000, b"sla_breach", &clk,
+        );
         assert!(staking::amount(&stake) == 45_000_000, 4);
         assert!(staking::lifetime_slashed(&stake) == 5_000_000, 5);
         assert!(insurance::balance_value(&pool) == 5_000_000, 6);
         ts::return_shared(stake);
+        ts::return_shared(attestation);
     };
 
     clock::destroy_for_testing(clk);
@@ -208,5 +217,75 @@ fun staking_below_minimum_aborts() {
 
     clock::destroy_for_testing(clk);
     admin::destroy_config_for_testing(config);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::staking::E_NO_SLA_BREACH)]
+fun staking_slash_without_breach_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut pool = insurance::new_for_testing<SUI>(sc.ctx());
+    let oracle_cap = quality::mint_oracle_cap_for_testing(sc.ctx());
+
+    let server_id = fresh_id(&mut sc);
+    let stake_coin = coin::mint_for_testing<SUI>(50_000_000, sc.ctx());
+    staking::post<SUI>(&config, server_id, stake_coin, 9_900, 86_400, 1_000, &clk, sc.ctx());
+
+    // Attestation reports 99.50% — at or above the 99.00% commitment, so NOT
+    // a breach: an OracleCap holder must not be able to slash an in-SLA server.
+    quality::attest(
+        &oracle_cap, server_id, 9_900, 9_950, 80, 100, 50, 0, 1_000, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(DEV);
+    let mut stake = sc.take_shared<staking::ServerStake<SUI>>();
+    let attestation = sc.take_shared<quality::QualityAttestation>();
+    staking::slash(
+        &oracle_cap, &mut stake, &mut pool, &attestation, 1_000_000, b"unjust", &clk,
+    );
+
+    ts::return_shared(stake);
+    ts::return_shared(attestation);
+    clock::destroy_for_testing(clk);
+    admin::destroy_config_for_testing(config);
+    insurance::destroy_for_testing(pool);
+    quality::destroy_oracle_cap_for_testing(oracle_cap);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::staking::E_ATTESTATION_SERVER_MISMATCH)]
+fun staking_slash_with_wrong_server_attestation_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut pool = insurance::new_for_testing<SUI>(sc.ctx());
+    let oracle_cap = quality::mint_oracle_cap_for_testing(sc.ctx());
+
+    let staked_server = fresh_id(&mut sc);
+    let other_server = fresh_id(&mut sc);
+    let stake_coin = coin::mint_for_testing<SUI>(50_000_000, sc.ctx());
+    staking::post<SUI>(&config, staked_server, stake_coin, 9_900, 86_400, 1_000, &clk, sc.ctx());
+
+    // A real breach, but attested for a DIFFERENT server — must not slash this stake.
+    quality::attest(
+        &oracle_cap, other_server, 5_000, 9_000, 200, 800, 50, 0, 1_000, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(DEV);
+    let mut stake = sc.take_shared<staking::ServerStake<SUI>>();
+    let attestation = sc.take_shared<quality::QualityAttestation>();
+    staking::slash(
+        &oracle_cap, &mut stake, &mut pool, &attestation, 1_000_000, b"wrong server", &clk,
+    );
+
+    ts::return_shared(stake);
+    ts::return_shared(attestation);
+    clock::destroy_for_testing(clk);
+    admin::destroy_config_for_testing(config);
+    insurance::destroy_for_testing(pool);
+    quality::destroy_oracle_cap_for_testing(oracle_cap);
     sc.end();
 }

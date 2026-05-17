@@ -1,0 +1,46 @@
+---
+title: Intents (spending intents)
+description: Delegate a capped budget to an agent so it can pay for calls without you signing each one.
+---
+
+A **SpendingIntent** lets a user delegate a budget to an agent address.
+The agent then settles calls — within scope, per-call cap, daily cap, and
+expiry — **without the user signing each call**. This is the primitive
+that makes a fully autonomous paying agent possible.
+
+Move module: `mcpx::intent` (`contracts/sources/intent.move`).
+
+## Policy fields
+
+- `user` — who granted the budget.
+- `agent` — who may spend it.
+- `daily_cap_atomic` — max spend per UTC day.
+- `per_call_cap_atomic` — max spend on any single call.
+- `allowed_categories` — list of tool categories the intent may pay for
+  (empty = any).
+- `today_spent_atomic` / `lifetime_spent_atomic` — running totals.
+- `expires_at_ms`, `revoked` — lifetime controls.
+
+## Key entry functions
+
+- `create(...)` — mint an intent delegating a capped budget.
+- `revoke(intent, clock, ctx)` — user kills the delegation immediately.
+
+## How a call uses it
+
+The money still moves through `settlement::settle_call_with_intent`
+(see the [Move reference](/docs/move/settlement)). The gateway routes a
+call through the intent when the client sends an intent id:
+
+```ts
+const result = await client.callTool(
+  'walrus-search_query',
+  { q: 'sui' },
+  { intentId: '0xintent...', category: 'intelligence' },
+);
+```
+
+The SDK forwards `X-Mcpx-Intent-Id` and `X-Mcpx-Category` headers; the
+gateway checks the category against `allowed_categories` and the amount
+against `per_call_cap` / remaining `daily_cap` before settling. See the
+[autonomous agent recipe](/docs/recipes/autonomous-agent).

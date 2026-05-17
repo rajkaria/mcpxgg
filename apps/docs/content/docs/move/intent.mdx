@@ -1,0 +1,25 @@
+---
+title: "mcpx::intent"
+description: Agent spending intents — delegated, capped, revocable budgets.
+---
+
+`contracts/sources/intent.move`
+
+A `SpendingIntent` delegates a budget from a `user` to an `agent`. The
+agent can settle calls within scope (`allowed_categories`),
+`per_call_cap_atomic`, `daily_cap_atomic`, and `expires_at_ms` — without
+the user signing each call. Money still moves through
+`settlement::settle_call_with_intent`.
+
+## Key entry functions
+
+- `create(...)` — mint an intent delegating a capped budget.
+- `revoke(intent, clock, ctx)` — user kills the delegation.
+
+## Read accessors
+
+`user`, `agent`, `daily_cap`, `per_call_cap`, `allowed_categories`,
+`today_spent`, `lifetime_spent`, `is_revoked`, `expires_at_ms`.
+
+See the [Intents concept](/docs/concepts/intents) and the
+[autonomous agent recipe](/docs/recipes/autonomous-agent).

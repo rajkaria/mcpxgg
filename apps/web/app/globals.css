@@ -237,3 +237,15 @@
     font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   }
 }
+
+/* ========== A11Y: REDUCED MOTION (S8-T18) ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,31 @@
+---
+title: Insurance pool
+description: 0.5% of every settled call funds outage and failed-call payouts.
+---
+
+The **InsurancePool** receives the insurance share — by default 0.5% of
+every settled call (`insurance_bps`, configurable in `PlatformConfig`).
+It pays out for verified outages, failed-call refunds, and slashed-stake
+recipients.
+
+Move module: `mcpx::insurance` (`contracts/sources/insurance.move`).
+
+## Capabilities
+
+- **`AdminCap`** (from the `admin` module) — emergency top-up / drain.
+- **`InsurancePayerCap`** — minted by the admin to one or more oracle
+  addresses; lets them authorize routine outage payouts without admin
+  sign-off.
+
+## Key entry functions
+
+- `initialize<T>(&AdminCap, ctx)` — create a per-coin pool.
+- `mint_payer_cap(&AdminCap, recipient, ctx)` — grant payout authority to
+  an oracle.
+- `top_up<T>(pool, contribution)` — anyone can donate to the pool.
+- `pay_out<T>(...)` — routine outage payout, gated by `InsurancePayerCap`.
+
+Failed-call refunds flow from `settlement::claim_for_failed_call`, which
+proves the claim with a soulbound `CallReceipt` (`success == false`,
+`refunded == false`) before the pool pays. The amount is pre-capped to
+the pool balance.

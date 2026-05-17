@@ -1,0 +1,3 @@
+/* Fumadocs 16 ships a prebuilt stylesheet — no Tailwind build needed here. */
+@import 'fumadocs-ui/style.css';
+@import 'fumadocs-ui/css/neutral.css';

@@ -1,0 +1,27 @@
+---
+title: Bundles
+description: Curated sets of servers with a per-call price multiplier.
+---
+
+A **Bundle** is a curated list of server IDs with a per-call price
+multiplier — a way to package complementary servers at a discount.
+
+Move module: `mcpx::bundle` (`contracts/sources/bundle.move`).
+
+## Shape
+
+- `name`, `creator`, `server_ids` — the curated set.
+- `price_multiplier_x100` — multiplier × 100. `90` = 0.9× = a 10%
+  discount applied to each server's per-call price when called through
+  the bundle.
+- `active` — whether the bundle is live.
+
+## Key entry functions
+
+- `create(...)` — publish a bundle over a set of server ids.
+- `deactivate(bundle, ctx)` — creator takes it offline.
+- `activate_for_user(bundle, clock, ctx)` — opt a user into bundle-aware
+  pricing.
+
+Bundle-aware settlement applies the multiplier as a per-server discount;
+the rest of the atomic settlement (fee split, receipt) is unchanged.

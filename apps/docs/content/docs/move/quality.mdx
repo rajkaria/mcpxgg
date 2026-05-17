@@ -1,0 +1,27 @@
+---
+title: "mcpx::quality"
+description: Oracle quality attestations — uptime, latency, error rate, composite score.
+---
+
+`contracts/sources/quality.move`
+
+The off-chain oracle observes uptime, latency, and error rates per server,
+then mints shared `QualityAttestation` objects. Authority is gated by
+`OracleCap` (multi-attestor — many oracles can hold caps). The
+[staking](/docs/move/staking) module reads attestations to decide
+slashing.
+
+## Key entry functions
+
+- `mint_oracle_cap(&AdminCap, recipient, ctx)` — grant attestation
+  authority.
+- `attest(...)` — publish a `QualityAttestation`.
+
+## Read accessors
+
+`server_id`, `score_x100` (0..10000 = 0–100.00%), `uptime_x100`,
+`p95_latency_ms`, `error_rate_x100`, `sample_count`, `window_start_ms`.
+
+The composite score is computed off-chain as
+`0.5·uptime + 0.3·(1 − err) + 0.2·latency_score` over deterministic,
+UTC-anchored windows; zero-call servers are not attested.

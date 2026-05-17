@@ -1,0 +1,86 @@
+---
+title: MCPX is mainnet on Sui
+description: A paid MCP tool call is now a first-class on-chain primitive — atomic USDsui settlement, soulbound receipts, no tokens.
+date: 2026-07-20
+author: The MCPX team
+---
+
+MCPX is live on **Sui mainnet**. As of today, calling a Model Context
+Protocol tool through MCPX is a settled, on-chain transaction: the user is
+debited in USDsui, the developer is paid, the platform takes its cut, the
+insurance pool is funded, and a permanent receipt is minted — all in one
+atomic Sui programmable transaction block.
+
+## What MCPX is
+
+MCPX is a marketplace, gateway, and x402 facilitator for MCP servers. The
+MCP ecosystem has thousands of servers and, until now, no native way to
+pay for them. MCPX makes a paid tool call a primitive:
+
+- A user pre-funds a **Session** (escrow) and gets a session API key.
+- The gateway authorizes the call and hands settlement to the
+  **facilitator**.
+- The facilitator builds **one** PTB calling
+  `mcpx::settlement::settle_call`: debit the session, split the amount,
+  credit the developer vault, the treasury, and the insurance pool, mint
+  a soulbound `CallReceipt`, emit `CallSettled`.
+- If any step fails, the whole transaction reverts. No partial state.
+
+Developers earn straight to a Sui **DeveloperVault** — no payout
+schedule, no minimum, no holding period. The money is theirs on-chain the
+moment the call settles.
+
+## The differentiator: x402 + USDsui
+
+Payment rails for AI tools have been credit balances, prepaid API keys, or
+monthly invoices — all custodial, all opaque, none verifiable. MCPX
+settles every call in **USDsui** (6-decimal stablecoin, no platform
+token) over the **x402** protocol, with two schemes:
+
+- **`exact`** — fixed-price tools: sign the price, pay the price.
+- **`upto`** — streaming / metered tools: sign a ceiling, get charged the
+  metered amount, and the contract enforces `0 ≤ actual ≤ ceiling`
+  on-chain. The unused remainder is never debited — an implicit refund
+  the buyer never has to claim.
+
+Pricing is always an absolute `bigint` in USDsui atomic units. There are
+no credit-cost integers anywhere in the system.
+
+## The five anchor servers
+
+Mainnet ships with five first-party servers so the marketplace is useful
+on day one — `walrus-search`, `walrus-store`, `sui-identity`,
+`sui-analytics`, and `sui-defi-data`. They double as worked references
+for anyone building their own server with `@mcpxgg/server` and publishing
+via `@mcpxgg/cli`.
+
+## The insurance pool
+
+0.5% of every settled call (configurable in the on-chain
+`PlatformConfig`, hard-capped sensibly) flows into a shared
+**InsurancePool**. If a tool call fails, the payer can recover the spend
+— the claim is proven by their soulbound receipt
+(`success == false`, `refunded == false`), so refunds are trust-minimized
+and verifiable, not a support ticket. The same pool backs SLA staking:
+developers lock collateral against a stated SLA, and oracle-attested
+breaches are slashed into it.
+
+## No tokens
+
+There is no MCPX token. Revenue is stablecoin from the first call. The
+2.5% take rate (0.5% insurance + 2.0% treasury) lives in an on-chain
+`PlatformConfig` shared object, mutable only by an admin multisig and
+hard-capped at 10% — so the economics are legible and bounded, not a
+roadmap promise. A governance token, if it ever exists, comes only
+post-launch with concrete utility.
+
+## Start now
+
+- [User quickstart](/docs/quickstart/user) — connect, recharge $1, call a
+  tool, inspect the receipt. Five minutes.
+- [Developer quickstart](/docs/quickstart/developer) — publish a server,
+  earn to your vault. Five minutes.
+- [Build an autonomous agent](/docs/recipes/autonomous-agent) — delegate
+  a capped, revocable budget and let an agent pay for itself.
+
+The chain is the source of truth. The receipts are permanent. Go build.

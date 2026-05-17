@@ -1,0 +1,20 @@
+---
+title: "mcpx::access"
+description: Scoped access keys — binding an HMAC API key to an on-chain SessionKey + scope.
+---
+
+`contracts/sources/access.move`
+
+A `ScopedKey` (`key + store`) narrows a `SessionKey` to a specific set of
+servers and an expiry — the on-chain side of rebinding an HMAC API key to
+a scoped capability.
+
+## Key entry functions
+
+- `mint_scoped_key<T>(...)` — mint a scoped key (gated by the session
+  owner).
+- `revoke(key, ctx)` — revoke a scoped key.
+
+## Read accessors
+
+`session_id`, `server_ids`, `expires_at_ms`, `is_revoked`.

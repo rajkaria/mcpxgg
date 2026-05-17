@@ -168,7 +168,14 @@ export interface AttestInput {
  * tests assert the calls without a node.
  */
 export interface QualityChainClient {
-  attest(input: AttestInput): Promise<{ digest: string }>;
+  /**
+   * Submits the attestation and returns the digest plus the on-chain object
+   * id of the shared `QualityAttestation` it created. The slash pass needs
+   * that id: `staking::slash` now aborts unless handed a fresh attestation
+   * proving the breach (security hardening). `null` if the chain returned no
+   * such created object (treated as "no proof available this tick").
+   */
+  attest(input: AttestInput): Promise<{ digest: string; attestationObjectId: string | null }>;
 }
 
 export interface OracleRunResult {
@@ -177,6 +184,13 @@ export interface OracleRunResult {
   serversMeasured: number;
   attestationsSubmitted: number;
   failures: { serverObjectId: string; error: string }[];
+  /**
+   * serverObjectId → freshly-created on-chain `QualityAttestation` object id,
+   * for the attestations this pass *successfully* submitted this tick. The
+   * SLA-slash pass consumes this to prove a breach on-chain (an attestation
+   * that returned no created object id is omitted — there is no usable proof).
+   */
+  attestationsByServer: Map<string, string>;
 }
 
 /**
@@ -194,10 +208,11 @@ export async function runQualityOracle(
   const samples = await store.getCallSamples(windowStartMs, windowEndMs);
   const qualities = computeAllServerQuality(samples);
   const failures: { serverObjectId: string; error: string }[] = [];
+  const attestationsByServer = new Map<string, string>();
   let submitted = 0;
   for (const q of qualities) {
     try {
-      await chain.attest({
+      const r = await chain.attest({
         serverObjectId: q.serverObjectId,
         scoreX100: q.scoreX100,
         uptimeX100: q.uptimeX100,
@@ -208,6 +223,11 @@ export async function runQualityOracle(
         windowEndMs,
       });
       submitted += 1;
+      // Only record an attestation id when the chain actually created one;
+      // without it the slash pass has no on-chain proof to reference.
+      if (r.attestationObjectId !== null) {
+        attestationsByServer.set(q.serverObjectId, r.attestationObjectId);
+      }
     } catch (e) {
       failures.push({ serverObjectId: q.serverObjectId, error: String(e) });
     }
@@ -218,6 +238,7 @@ export async function runQualityOracle(
     serversMeasured: qualities.length,
     attestationsSubmitted: submitted,
     failures,
+    attestationsByServer,
   };
 }
 
@@ -259,6 +280,13 @@ export interface BreachStreakStore {
 export interface SlashInput {
   stakeObjectId: string;
   serverObjectId: string;
+  /**
+   * Fresh on-chain `QualityAttestation` object id (created this tick by the
+   * quality-attest pass for this same server) that proves the SLA breach.
+   * `staking::slash` aborts without it — an OracleCap alone can no longer
+   * slash (E_ATTESTATION_SERVER_MISMATCH / E_NO_SLA_BREACH / E_STALE_ATTESTATION).
+   */
+  attestationObjectId: string;
   amountAtomic: bigint;
   reason: string;
 }
@@ -280,6 +308,12 @@ export interface SlaSlashResult {
   inBreach: number;
   slashesSubmitted: number;
   slashedAtomicTotal: bigint;
+  /**
+   * Breached stakes that would have been slashed this tick but were skipped
+   * because no fresh `QualityAttestation` exists for that server (attest
+   * failed/absent). The streak is preserved so it retries next window.
+   */
+  skippedNoAttestation: number;
   failures: { stakeObjectId: string; error: string }[];
 }
 
@@ -294,6 +328,14 @@ export interface SlaSlashResult {
  * the rest; the streak is only advanced *after* a successful slash submission
  * for the slashing case so a failed slash is retried next window rather than
  * silently dropped.
+ *
+ * `attestationsByServer` is the map the quality-attest pass produced *this same
+ * tick* (serverObjectId → fresh QualityAttestation object id). `staking::slash`
+ * now aborts without a fresh proving attestation, so when a breached stake's
+ * server has no attestation id this tick we SKIP the slash entirely (an
+ * unprovable slash would just abort on-chain) and preserve the streak so it
+ * retries next window — mirroring the existing "failed slash → streak not
+ * advanced" semantics.
  */
 export async function runSlaSlashing(
   stakeStore: StakeStore,
@@ -302,6 +344,7 @@ export async function runSlaSlashing(
   samples: readonly CallSample[],
   windowStartMs: number,
   windowEndMs: number,
+  attestationsByServer: ReadonlyMap<string, string>,
 ): Promise<SlaSlashResult> {
   const stakes = await stakeStore.listActiveStakes();
   // Reuse the same pure quality fold for per-server uptime/sample-count.
@@ -312,6 +355,7 @@ export async function runSlaSlashing(
   let inBreach = 0;
   let slashesSubmitted = 0;
   let slashedTotal = 0n;
+  let skippedNoAttestation = 0;
 
   for (const stake of stakes) {
     try {
@@ -348,9 +392,30 @@ export async function runSlaSlashing(
         continue;
       }
 
+      const attestationObjectId = attestationsByServer.get(
+        stake.serverObjectId,
+      );
+      if (attestationObjectId === undefined) {
+        // No fresh on-chain attestation proving this breach (attest failed or
+        // produced no object this tick). `staking::slash` would abort, so
+        // don't even attempt it. Preserve the streak (it already crossed the
+        // threshold) so the slash is retried next window once an attestation
+        // exists — same semantics as a failed slash tx.
+        skippedNoAttestation += 1;
+        failures.push({
+          stakeObjectId: stake.stakeObjectId,
+          error:
+            `skipped: no fresh QualityAttestation for server ` +
+            `${stake.serverObjectId} this tick — slash would abort on-chain`,
+        });
+        await streakStore.setStreak(stake.stakeObjectId, consecutiveBreaches);
+        continue;
+      }
+
       await chain.slash({
         stakeObjectId: stake.stakeObjectId,
         serverObjectId: stake.serverObjectId,
+        attestationObjectId,
         amountAtomic: amount,
         reason: slashReason(evaluation, consecutiveBreaches, windowEndMs),
       });
@@ -371,6 +436,7 @@ export async function runSlaSlashing(
     inBreach,
     slashesSubmitted,
     slashedAtomicTotal: slashedTotal,
+    skippedNoAttestation,
     failures,
   };
 }

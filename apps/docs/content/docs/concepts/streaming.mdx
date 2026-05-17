@@ -1,0 +1,26 @@
+---
+title: Pay-per-output streaming
+description: The x402 `upto` scheme — sign a ceiling, get metered on actual usage, the rest is implicitly refunded.
+---
+
+Some tools stream output and you cannot know the price up front (think
+token-metered LLM tools). MCPX handles this with the x402 **`upto`**
+scheme.
+
+## exact vs upto
+
+- **`exact`** — the buyer signs the exact `amountAtomic`; that is what is
+  debited. The default for fixed-price tools.
+- **`upto`** — the buyer signs a **ceiling** (`amountAtomic`). The
+  facilitator meters actual usage and settles the *real* amount, which is
+  guaranteed `0 ≤ actual ≤ ceiling`. The difference is never charged — an
+  implicit refund the payer never had to claim.
+
+On-chain this is enforced by `settlement::settle_call_upto` (and
+`settle_call_upto_with_intent` for agent budgets). The contract asserts
+`0 ≤ settled ≤ quoted_max`. The `UptoSettled` event records the quoted
+ceiling vs. the metered amount so indexers and dashboards can show the
+implicit refund delta.
+
+See the [x402 facilitator spec](/docs/x402/spec) for the wire format and
+the `UptoSettleExtra` settle-time supplement.

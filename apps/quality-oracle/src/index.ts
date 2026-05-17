@@ -79,6 +79,10 @@ export async function runOnce(
       samples,
       startMs,
       endMs,
+      // Same-tick attestation proofs from the quality pass above. A breached
+      // stake whose server isn't in this map is skipped (slash would abort
+      // on-chain without a fresh proving attestation).
+      res.attestationsByServer,
     );
     logger.info(
       {
@@ -87,6 +91,7 @@ export async function runOnce(
         inBreach: slash.inBreach,
         slashed: slash.slashesSubmitted,
         slashedAtomic: slash.slashedAtomicTotal.toString(),
+        skippedNoAttestation: slash.skippedNoAttestation,
         failures: slash.failures.length,
       },
       'quality-oracle: SLA-slash pass complete',

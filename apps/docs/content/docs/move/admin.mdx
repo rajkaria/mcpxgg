@@ -1,0 +1,29 @@
+---
+title: "mcpx::admin"
+description: PlatformConfig + AdminCap — the on-chain economic knobs.
+---
+
+`contracts/sources/admin.move`
+
+Holds the mutable post-deploy knobs: `take_rate_bps` (default 250),
+`insurance_bps` (default 50; treasury share is implicitly
+`take_rate_bps - insurance_bps`), `subsidy_atomic` (default 1_000_000 —
+the per-user bootstrap grant), `sla_min_stake_atomic`, and `paused` (a
+circuit breaker other modules read via `assert_not_paused`).
+
+Mutations are gated by `AdminCap`, held by an admin multisig in
+production (ADR-004). The take rate is **hard-capped at 10%** — this
+protects users even from admin-multisig misconfiguration.
+
+## Key entry functions
+
+- `set_take_rate(&AdminCap, config, ...)` — change the take split (≤ 10%).
+- `set_subsidy(&AdminCap, config, new_atomic)` — change the bootstrap
+  grant.
+- `set_sla_min_stake(&AdminCap, config, new_atomic)`.
+- `set_paused(&AdminCap, config, ...)` — circuit breaker.
+
+## Read accessors
+
+`take_rate_bps`, `insurance_bps`, `treasury_bps`, `subsidy_atomic`,
+`sla_min_stake_atomic`, `is_paused`, `assert_not_paused`, `version`.

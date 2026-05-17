@@ -1,0 +1,63 @@
+---
+title: "@mcpxgg/sdk (client)"
+description: The consumer SDK — a thin JSON-RPC client over the gateway's tools/call. Every call settles on-chain.
+---
+
+The package name is **`@mcpxgg/sdk`** (source: `packages/sdk-client`). It
+is a thin JSON-RPC client over the gateway's `tools/call`. Every call
+settles on-chain; the receipt is returned inline.
+
+```ts
+import { createMCPXClient } from '@mcpxgg/sdk';
+
+const client = createMCPXClient({ apiKey: process.env.MCPX_API_KEY! });
+const result = await client.callTool('walrus-search_query', { q: 'sui' });
+console.log(result.data);
+console.log(result.receipt); // { txDigest, blobId, amountAtomic, chain, settlement }
+```
+
+## `createMCPXClient(opts): MCPXClient`
+
+`MCPXClientOptions`:
+
+| Option       | Type            | Notes                                                            |
+| ------------ | --------------- | ---------------------------------------------------------------- |
+| `apiKey`     | `string`        | **Required.** Session API key (`mcpx_sk_...`).                    |
+| `baseUrl`    | `string`        | Gateway base. Default `https://gateway.mcpx.gg`.                 |
+| `intentId`   | `string`        | Default spending-intent id for every `callTool`. Optional.       |
+| `category`   | `string`        | Default category for intent scope checks. Optional.              |
+| `fetchImpl`  | `typeof fetch`  | Injected fetch for tests / non-global-fetch runtimes.            |
+| `timeoutMs`  | `number`        | Per-call timeout. Default `30_000`.                              |
+
+## `client.callTool(name, args?, options?)`
+
+`CallToolOptions`: `{ intentId?: string; category?: string }`. When
+`intentId` is present the SDK sends the `X-Mcpx-Intent-Id` header and the
+gateway routes settlement through `settle_call_with_intent`; `category`
+becomes `X-Mcpx-Category` and is checked against the intent's
+`allowed_categories`. Omit both for normal session settlement (fully
+backward compatible).
+
+Returns `CallToolResult`:
+
+```ts
+interface CallToolResult {
+  data: unknown;
+  isError: boolean; // true if the upstream tool errored (no settlement)
+  receipt: {
+    txDigest: string;
+    blobId: string;
+    amountAtomic: bigint;
+    chain: string;
+    settlement: string; // 'settled' | 'pending' | 'free'
+  };
+}
+```
+
+## Errors
+
+Failures throw `MCPXError` with a machine-readable `.code` (e.g.
+`intent_revoked`, `auth_required`, `connection_error`, `server_error`)
+and, for protocol-level failures, a numeric `.rpcCode`.
+
+`SDK_VERSION` is exported as a constant.

@@ -1,0 +1,41 @@
+---
+title: "mcpx::settlement"
+description: The atomic PTB that ties everything together — debit, split, credit, mint, emit.
+---
+
+`contracts/sources/settlement.move`
+
+The atomic settlement. The facilitator builds one transaction calling
+`settle_call`, which: asserts the platform isn't paused / server active /
+vault belongs to the server owner; asserts the tool exists (amounts are
+**not** compared — the facilitator may charge a discounted/free-tier
+price); debits the user's `Session` (enforcing caps, scope, expiry,
+balance); splits the debited balance three ways —
+
+- `insurance_share = amount * insurance_bps / 10_000`
+- `treasury_share  = amount * (take_rate_bps - insurance_bps) / 10_000`
+- `dev_share       = amount - insurance_share - treasury_share`
+
+— credits each pool/vault, mints a soulbound `CallReceipt`
+(`key`-only, ADR-005), and emits `CallSettled`. **If any step fails the
+entire PTB reverts.**
+
+## Key entry functions
+
+- `settle_call<T>(...)` — the standard atomic settlement.
+- `settle_call_with_intent<T>(...)` — settle against a delegated
+  [SpendingIntent](/docs/move/intent) instead of the session's own caps.
+- `settle_call_upto<T>(...)` — the [`upto`](/docs/concepts/streaming)
+  scheme; enforces `0 ≤ settled ≤ quoted_max`.
+- `settle_call_upto_with_intent<T>(...)` — `upto` + intent.
+- `claim_for_failed_call<T>(...)` — refund a failed call from the
+  [Insurance pool](/docs/move/insurance), proven by the soulbound receipt.
+
+## Receipt accessors
+
+`receipt_payer`, `receipt_server_id`, `receipt_session_id`,
+`receipt_amount`, `receipt_dev_share`, `receipt_treasury_share`,
+`receipt_insurance_share`, `receipt_success`, `receipt_refunded`,
+`receipt_log_blob_id`, `receipt_tool_name`, `receipt_settled_at_ms`.
+
+See the [Receipts concept](/docs/concepts/receipts).

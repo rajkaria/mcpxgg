@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "composite": false
+  },
+  "include": ["migrate-web2-users.ts", "migrate-web2-users.test.ts", "loadtest/**/*.ts"],
+  "exclude": ["node_modules", "dist", "build", ".turbo"]
+}

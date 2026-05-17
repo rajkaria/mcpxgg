@@ -1,0 +1,36 @@
+---
+title: "@mcpxgg/widget"
+description: The embeddable <mcpx-call> Web Component. One script tag, on-chain settlement, no framework.
+---
+
+The package name is **`@mcpxgg/widget`** (source: `packages/widget`). It
+ships a single framework-agnostic Web Component — **`<mcpx-call>`** — that
+calls any marketplace tool from any page. It reuses `@mcpxgg/sdk` for the
+call so it never re-implements settlement.
+
+```html
+<script type="module"
+  src="https://unpkg.com/@mcpxgg/widget/dist/mcpx-widget.esm.js"></script>
+<mcpx-call server="walrus-search" tool="query" prefill='{"q":"sui"}'></mcpx-call>
+```
+
+For the full attribute table, theming tokens, wallet/Privy fallback chain,
+and a copy-paste third-party demo, see the
+[Embed a tool recipe](/docs/recipes/embed-a-tool).
+
+## Exported API surface
+
+From `@mcpxgg/widget`:
+
+| Export                                                        | Purpose                                                    |
+| ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `WIDGET_VERSION`                                               | version constant                                           |
+| `McpxCallElement`, `defineMcpxCall`                            | the element class and the registrar (custom tag name)      |
+| `callThroughGateway`, `qualifiedToolName`, `extractText`, `receiptExplorerUrl`, `DEFAULT_GATEWAY_URL`, `MCPXError` | gateway helpers                                             |
+| `WidgetCallInput`, `WidgetCallResult` (types)                  | call I/O types                                              |
+| `parseWidgetAttrs`, `OBSERVED_ATTRS`, `WidgetAttrs`, `ParseResult` | attribute parsing                                           |
+| `resolveTheme`, `baseTokens`, `effectiveThemeName`, `tokensToCss`, `ThemeTokens`, `ThemeName` | theming                                                     |
+| `resolveWallet`, `isLikelySessionKey`, `WalletResolution`, `WalletKind` | wallet/auth resolution                                      |
+
+Importing the package auto-registers `<mcpx-call>` in a browser (no-op in
+Node/SSR). Use `defineMcpxCall('my-tag')` to register under a custom name.

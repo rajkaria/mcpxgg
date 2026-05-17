@@ -2,11 +2,29 @@
   "name": "@mcpxgg/docs",
   "version": "0.1.0",
   "private": true,
-  "description": "Public documentation site. Sprint 8 fleshes this out.",
+  "description": "Public documentation site for MCPX — docs.mcpx.gg (Fumadocs on Next.js).",
   "scripts": {
-    "dev": "echo 'docs: scaffold only, see docs/SPRINTS.md Sprint 8'",
-    "build": "echo 'docs: build wired in Sprint 8'",
-    "lint": "echo 'docs: lint wired in Sprint 8'",
-    "typecheck": "echo 'docs: typecheck wired in Sprint 8'"
+    "dev": "next dev -p 3030",
+    "build": "next build --webpack",
+    "start": "next start -p 3030",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .next .turbo .source",
+    "postinstall": "fumadocs-mdx"
+  },
+  "dependencies": {
+    "fumadocs-core": "16.8.11",
+    "fumadocs-mdx": "15.0.6",
+    "fumadocs-ui": "16.8.11",
+    "next": "16.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
   }
 }

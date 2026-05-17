@@ -19,8 +19,17 @@ const categories = [
 ];
 
 export const metadata = {
-  title: "Marketplace | MCPX",
-  description: "Browse and enable MCP servers for your AI workflows.",
+  title: "Marketplace",
+  description:
+    "Browse and enable MCP servers, ranked by on-chain quality attestations. Every call settles in USDsui on Sui.",
+  alternates: { canonical: "/marketplace" },
+  openGraph: {
+    title: "MCPX Marketplace",
+    description:
+      "Browse and enable MCP servers, ranked by on-chain quality attestations.",
+    url: "/marketplace",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default async function MarketplacePage({
@@ -150,11 +159,11 @@ export default async function MarketplacePage({
       </nav>
 
       {/* Page content */}
-      <div className="max-w-7xl mx-auto px-6 pt-28 pb-12">
+      <main className="max-w-7xl mx-auto px-6 pt-28 pb-12">
         {/* Page title */}
         <div className="mb-10">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-3">
-            <span className="text-gradient">Marketplace</span>
+            Marketplace
           </h1>
           <p className="text-lg" style={{ color: "var(--text-secondary)" }}>
             Discover and enable MCP servers for your AI workflows.
@@ -169,7 +178,7 @@ export default async function MarketplacePage({
           initialSort={params.sort || "popular"}
           initialStakedOnly={stakedOnly}
         />
-      </div>
+      </main>
     </div>
   );
 }

@@ -1,0 +1,71 @@
+---
+title: "@mcpxgg/server"
+description: The developer SDK for building MCP servers on MCPX — pricing in USDsui atomic, optional pay-per-output streaming.
+---
+
+The package name is **`@mcpxgg/server`** (source: `packages/sdk-server`).
+It builds an MCP server whose tools are priced in USDsui atomic units and
+metered by the gateway.
+
+```ts
+import { createMCPXServer } from '@mcpxgg/server';
+
+const server = createMCPXServer({ namespace: 'my-server' });
+server.tool('analyze', {
+  description: 'Analyze something',
+  inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+  pricing: { perCallAtomic: 5_000n }, // 0.005 USDsui
+  handler: async (args, ctx) => ({ result: '...' }),
+});
+server.listen(3000);
+```
+
+## `createMCPXServer(opts): MCPXServer`
+
+`MCPXServerOptions`: `{ namespace: string; description?: string }`.
+
+`MCPXServer`:
+
+| Member        | Signature                                              |
+| ------------- | ------------------------------------------------------ |
+| `namespace`   | `readonly string`                                      |
+| `tool`        | `(name, def: ToolDefinition) => MCPXServer` (chainable) |
+| `manifest`    | `() => ServerManifest`                                 |
+| `listTools`   | `() => RegisteredTool[]`                               |
+| `fetch`       | `(req: Request) => Response \| Promise<Response>` (Hono handler) |
+| `listen`      | `(port) => Promise<{ port; close }>`                   |
+
+## `ToolDefinition`
+
+```ts
+interface ToolDefinition {
+  description: string;
+  inputSchema: Record<string, unknown>;
+  pricing: ToolPricing;        // { perCallAtomic: bigint; freeTierCallsPerUser?: number }
+  timeoutSeconds?: number;
+  handler: ToolHandler;
+}
+```
+
+## `ToolContext`
+
+Settlement fields are populated by the gateway **after** it settles
+on-chain and re-injects them as headers. When the server is hit directly
+(no gateway) they are undefined.
+
+- `payerAddress?` — paying Sui address (`X-Mcpx-Payer`).
+- `txDigest?` — settlement tx digest.
+- `receiptBlobId?` — Walrus blob id of the archived request/response.
+- `requestId` — correlates gateway and server logs.
+
+## Pay-per-output streaming
+
+A handler may return a single `ToolResult` **or** an
+`AsyncIterable<ToolStreamChunk>`. Each `ToolStreamChunk` is metered
+independently by the gateway. `priceAtomic` on a chunk overrides the
+tool's per-call price for *that* chunk (used with the x402
+[`upto` scheme](/docs/concepts/streaming)); omit it to charge the
+per-call price once per chunk. Returning a non-iterable `ToolResult` is
+fully backward compatible.
+
+`SDK_VERSION` is exported.

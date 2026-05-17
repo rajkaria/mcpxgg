@@ -1,0 +1,65 @@
+---
+title: User quickstart (5 min)
+description: Connect with Privy, recharge $1 of USDsui, call a tool, and inspect the on-chain receipt.
+---
+
+This path takes you from zero to a settled, on-chain MCP tool call in about
+five minutes. You need a browser and roughly $1.
+
+## 1. Connect (≈1 min)
+
+Open [mcpx.gg](https://mcpx.gg) and click **Connect**. Authentication is
+via **Privy** — choose any of:
+
+- An external Sui wallet (Suiet, Slush, Surf, Phantom-Sui).
+- Social login: Google, email, Apple, Discord, or Twitter. Privy
+  provisions an embedded Sui wallet for you; you never handle a seed
+  phrase.
+
+A first-time wallet is auto-granted a small **subsidy** (a bootstrap
+USDsui grant from the platform, default 1.0 USDsui) so you can try a call
+before funding anything.
+
+## 2. Recharge $1 (≈1 min)
+
+Go to **Dashboard → Recharge**. Add **1 USDsui**. Under the hood this
+calls `session::deposit` on your **Session** — a pre-funded escrow object
+the settlement contract debits per call. Balances are tracked in **atomic
+units**: USDsui has 6 decimals, so 1 USDsui = `1_000_000` atomic.
+
+> You are never charged a credit card. There is no subscription. You spend
+> exactly the per-call price of the tools you call, plus the 2.5% take
+> rate, and nothing else.
+
+## 3. Call a tool (≈2 min)
+
+Open the [Marketplace](https://mcpx.gg/marketplace) and pick a server —
+e.g. **`walrus-search`**. On the server detail page, the embedded
+`<mcpx-call>` widget lets you run a tool right there. Try `query` with
+`{"q":"sui"}` and click **Call**.
+
+When you click Call:
+
+1. The gateway authorizes your session key.
+2. The **facilitator** builds one Sui programmable transaction block that
+   debits your session, splits the fee (dev / treasury / insurance), and
+   mints your receipt.
+3. The tool result and the receipt come back inline.
+
+## 4. See the receipt (≈1 min)
+
+The widget shows a **receipt** block with a `txDigest`. Open it in a Sui
+explorer, or visit **Dashboard → Receipts**. You will see a soulbound
+`CallReceipt` object recording the payer, server, amount, the three fee
+shares, and a Walrus `blobId` pointing at the permanently-retained call
+log.
+
+That receipt can never be transferred or deleted. It is your permanent,
+verifiable proof the call happened and was paid for.
+
+## Next
+
+- [Build an autonomous agent](/docs/recipes/autonomous-agent) that pays
+  for its own calls under a capped delegated budget.
+- [Embed a tool](/docs/recipes/embed-a-tool) on your own site with one
+  script tag.

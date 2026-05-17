@@ -1,0 +1,26 @@
+---
+title: "mcpx::staking"
+description: Server SLA staking — locked collateral, oracle-attested slashing to the insurance pool.
+---
+
+`contracts/sources/staking.move`
+
+A developer locks USDsui as `ServerStake<T>` collateral against a stated
+SLA. If the quality oracle observes a breach, an `OracleCap` holder can
+slash a portion, routing it to the [Insurance pool](/docs/move/insurance).
+A `lock_until` timestamp prevents the developer bailing right before an
+attestation lands.
+
+## Key entry functions
+
+- `post<T>(...)` — lock collateral against an SLA tier.
+- `top_up<T>(stake, deposit, ctx)` — add collateral.
+- `withdraw<T>(...)` — withdraw after the lock expires.
+- `slash<T>(...)` — slash to the insurance pool on an attested breach
+  (oracle-gated).
+
+## Read accessors
+
+`owner`, `server_id`, `amount`, `sla_uptime_x100`, `sla_window_seconds`.
+
+See the [SLA staking concept](/docs/concepts/sla-staking).

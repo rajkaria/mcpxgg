@@ -67,7 +67,7 @@ export default async function InsurancePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
+    <main className="mx-auto max-w-4xl p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Insurance Pool</h1>
         <p
@@ -184,6 +184,6 @@ export default async function InsurancePage() {
         </Link>
         .
       </p>
-    </div>
+    </main>
   );
 }
