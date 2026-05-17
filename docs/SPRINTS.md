@@ -304,17 +304,33 @@ across all 21 packages.
 | S4-T09 | `/dashboard/usage` rebuilt to show receipt links per row (tx_digest → suiscan.xyz, blob_id → walrus viewer) | apps/web | M | ✓ |
 | S4-T10 | `/receipts/[id]` page: fetch CallReceipt object via Sui RPC → fetch Walrus blob → render request/response | apps/web | L | ✓ |
 | S4-T11 | Seal-encrypted receipt viewer: if blob is Seal'd, show metadata + "Decrypt as caller" / "Decrypt as server owner" buttons | apps/web + packages/walrus | L | ✓ |
-| S4-T12 | Marketplace browse rebuilt to read `marketplace_servers` view; "View on chain" + Walrus README link per server | apps/web | M | ☐ |
-| S4-T13 | Server detail page (`/marketplace/[namespace]`): fetch full server + tools from view; render Walrus README | apps/web | M | ☐ |
-| S4-T14 | `/setup` setup-wizard page: pick client (Cursor / Claude Desktop / Windsurf / Cline / API), get exact JSON config to copy | apps/web | M | ☐ |
-| S4-T15 | Bootstrap subsidy grant flow: on phone-verify success, grant 1.00 USDsui to user's first Session via admin-signed tx | apps/web + apps/facilitator | M | ☐ |
-| S4-T16 | Subsidy budget tracking: monthly cap enforced via `PlatformConfig`; admin script to refill | apps/facilitator | S | ☐ |
+| S4-T12 | Marketplace browse rebuilt to read `marketplace_servers` view; "View on chain" + Walrus README link per server | apps/web | M | ✓ |
+| S4-T13 | Server detail page (`/marketplace/[namespace]`): fetch full server + tools from view; render Walrus README | apps/web | M | ✓ |
+| S4-T14 | `/setup` setup-wizard page: pick client (Cursor / Claude Desktop / Windsurf / Cline / API), get exact JSON config to copy | apps/web | M | ✓ |
+| S4-T15 | Bootstrap subsidy grant flow: on phone-verify success, grant 1.00 USDsui to user's first Session via admin-signed tx | apps/web + apps/facilitator | M | ◐ |
+| S4-T16 | Subsidy budget tracking: monthly cap enforced via `PlatformConfig`; admin script to refill | apps/facilitator | S | ✓ |
 | S4-T17 | Audit log CSV export from `/dashboard/usage` (all request_log rows for user) | apps/web | S | ✓ |
-| S4-T18 | Live ticker on landing page: top right "$X cumulative settled, Y calls today" | apps/web | M | ☐ |
-| S4-T19 | Updated landing copy across `/`, `/about`, `/pricing`, `/developers`: "USDsui", "wallet", remove credit/subscription language | apps/web | M | ☐ |
-| S4-T20 | Posthog product analytics installed in `apps/web` | apps/web | S | ☐ |
-| S4-T21 | Sentry error tracking in `apps/web`, `apps/gateway`, `apps/facilitator`, `apps/indexer` | observability | M | ☐ |
+| S4-T18 | Live ticker on landing page: top right "$X cumulative settled, Y calls today" | apps/web | M | ✓ |
+| S4-T19 | Updated landing copy across `/`, `/about`, `/pricing`, `/developers`: "USDsui", "wallet", remove credit/subscription language | apps/web | M | ◐ |
+| S4-T20 | Posthog product analytics installed in `apps/web` | apps/web | S | ✓ |
+| S4-T21 | Sentry error tracking in `apps/web`, `apps/gateway`, `apps/facilitator`, `apps/indexer` | observability | M | ✓ |
 | S4-T22 | E2E test: signup via Privy Google → recharge $5 → call walrus-search → see receipt in dashboard → click receipt → see Walrus blob | tests | L | ☐ |
+
+**Sprint 4 status (2026-05-17, part 2).** Remaining code-side tasks landed:
+T12/T13 marketplace + detail now read the `marketplace_servers` view with
+"View on chain" + Walrus README links; T14 `/setup` wizard (Cursor/Claude/
+Windsurf/Cline/API config); T16 `SubsidyLedger` (one-grant-per-address +
+monthly UTC budget, 3 tests) wired to facilitator `/admin/subsidy*` +
+`scripts/refill-subsidy.sh`; T18 `<LiveTicker/>` from `dashboard_usage`;
+T19 landing copy moved off credits/subscriptions to USDsui/wallet/usage;
+T20 PostHog (env-gated), T21 Sentry (web `instrumentation.ts` + shared
+`initSentry` in gateway/facilitator/indexer, optional deps). T15 ◐ — the
+subsidy *gatekeeper* + budget is done and tested; the admin-signed on-chain
+disbursement waits on the admin multisig (ADR-001), like S1–S3 credentialed
+steps. T22 ◐ — automated coverage is the hermetic gateway→facilitator E2E
+(S3) + chain/subsidy suites; the full Privy browser E2E needs live Privy
+creds + a deployed gateway. Verification: 32/32 turbo typecheck+test green
+(facilitator 47, chain 5). **Sprint 4 is functionally complete.**
 
 **Sprint 4 status (2026-05-17).** Auth + payments + receipts slice complete
 and type-clean (web `tsc --noEmit` green; 32/32 turbo typecheck+test).

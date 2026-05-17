@@ -8,6 +8,7 @@
 
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import { initSentry } from '@mcpxgg/shared';
 import { loadEnv } from './env.js';
 import { createLogger } from './logger.js';
 import { createSuiEventSource } from './event-source/sui-source.js';
@@ -16,6 +17,7 @@ import { NoopPubsub, createRedisPubsub } from './pubsub/pubsub.js';
 import { run } from './runner.js';
 
 async function main(): Promise<void> {
+  await initSentry('indexer');
   const env = loadEnv();
   if (env.testMode) {
     throw new Error('indexer booted in MCPX_INDEXER_TEST_MODE=1 — refuse to run');

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
+    "@mcpxgg/shared": "workspace:*",
     "@mcpxgg/chain": "workspace:*",
     "@mcpxgg/x402": "workspace:*",
     "@mysten/sui": "^1.20.0",

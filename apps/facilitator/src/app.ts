@@ -16,6 +16,10 @@ export interface AppDeps {
   env: FacilitatorEnv;
   backend: SuiBackend;
   gasStation: GasStation;
+  /** S4-T15/T16 bootstrap-subsidy gatekeeper. Optional. */
+  subsidy?: import('./subsidy.js').SubsidyLedger;
+  /** Bearer token required on /admin/subsidy. */
+  adminToken?: string;
   logger?: Logger;
 }
 
@@ -129,6 +133,44 @@ export function createApp(deps: AppDeps): Hono {
       spentTodayMist: snap.spentTodayMist.toString(),
       dailyBudgetMist: deps.env.gasStationDailyBudgetSui.toString(),
       currentUtcDay: snap.currentUtcDay,
+    });
+  });
+
+  // S4-T15/T16: bootstrap-subsidy gatekeeper. Budget + one-per-address.
+  app.post('/admin/subsidy/grant', async (c) => {
+    if (!deps.subsidy) {
+      return c.json({ error: 'subsidy not configured' }, 503);
+    }
+    const auth = c.req.header('authorization') ?? '';
+    const tok = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : '';
+    if (!deps.adminToken || tok !== deps.adminToken) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { address?: string };
+    if (!body.address) return c.json({ error: 'address required' }, 400);
+    const decision = deps.subsidy.request(body.address, deps.backend.nowMs());
+    log.info(
+      { action: 'subsidy', address: body.address, approved: decision.approved, reason: decision.reason },
+      'subsidy',
+    );
+    return c.json(
+      {
+        approved: decision.approved,
+        amountAtomic: decision.amountAtomic.toString(),
+        remainingBudgetAtomic: decision.remainingBudgetAtomic.toString(),
+        ...(decision.reason ? { reason: decision.reason } : {}),
+      },
+      decision.approved ? 200 : 409,
+    );
+  });
+
+  app.get('/admin/subsidy', (c) => {
+    if (!deps.subsidy) return c.json({ error: 'subsidy not configured' }, 503);
+    const snap = deps.subsidy.snapshot(deps.backend.nowMs());
+    return c.json({
+      month: snap.month,
+      spentAtomic: snap.spentAtomic.toString(),
+      budgetAtomic: snap.budgetAtomic.toString(),
     });
   });
 

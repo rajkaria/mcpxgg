@@ -10,6 +10,7 @@
 
 import { serve } from '@hono/node-server';
 import { FacilitatorClient } from '@mcpxgg/x402';
+import { initSentry } from '@mcpxgg/shared';
 import { createWalrusClient, walrusEnv } from '@mcpxgg/walrus';
 import { createApp } from './app.js';
 import { loadEnv } from './env.js';
@@ -20,6 +21,7 @@ import { devSessionSigner } from './settlement.js';
 import type { GatewayDeps } from './handler.js';
 
 async function main(): Promise<void> {
+  await initSentry('gateway');
   const env = loadEnv();
   if (env.testMode) {
     throw new Error('gateway booted with MCPX_GATEWAY_TEST_MODE=1 — refuse to serve real traffic');

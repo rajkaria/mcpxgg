@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getActiveChain } from "@mcpxgg/chain";
 import { createClient } from "@/lib/supabase/server";
+import { getMarketplaceServer, usdsui } from "@/lib/chain/reads";
 import { ServerDetailClient } from "./server-detail-client";
+
+const WALRUS_AGG =
+  process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR_URL ??
+  "https://aggregator.walrus-testnet.walrus.space";
 
 export async function generateMetadata({
   params,
@@ -44,6 +50,9 @@ export default async function ServerDetailPage({
   }
 
   const s = server as any;
+  // S4-T13: chain-mirror facts (object id, README blob, settle digest).
+  const view = await getMarketplaceServer(namespace);
+  const chain = getActiveChain();
 
   // Fetch tools for this server
   const { data: tools } = await supabase
@@ -146,9 +155,44 @@ export default async function ServerDetailPage({
             >
               {s.namespace}
             </p>
-            <p className="text-base leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-base leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>
               {s.description || "No description available."}
             </p>
+
+            {view && (
+              <div className="flex flex-wrap gap-4 mb-6 text-sm">
+                <a
+                  className="underline"
+                  style={{ color: "var(--primary)" }}
+                  href={chain.objectExplorerUrl(view.objectId)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View on chain ↗
+                </a>
+                {view.metadataBlobId && (
+                  <a
+                    className="underline"
+                    style={{ color: "var(--primary)" }}
+                    href={`${WALRUS_AGG}/v1/blobs/${view.metadataBlobId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    README on Walrus ↗
+                  </a>
+                )}
+                {view.txDigest && (
+                  <a
+                    className="underline opacity-70"
+                    href={chain.txExplorerUrl(view.txDigest)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    publish tx ↗
+                  </a>
+                )}
+              </div>
+            )}
 
             {/* Stats */}
             <div className="flex flex-wrap gap-6 text-sm" style={{ color: "var(--text-muted)" }}>
@@ -242,7 +286,9 @@ export default async function ServerDetailPage({
                             color: "var(--text-muted)",
                           }}
                         >
-                          {tool.credit_cost || 1} credit{(tool.credit_cost || 1) !== 1 ? "s" : ""}
+                          {tool.price_atomic
+                            ? `${usdsui(BigInt(tool.price_atomic))} USDsui`
+                            : "free"}
                         </span>
                       </td>
                     </tr>

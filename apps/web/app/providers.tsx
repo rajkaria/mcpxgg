@@ -6,10 +6,15 @@
  * if NEXT_PUBLIC_PRIVY_APP_ID is unset (local dev without Privy).
  */
 
+import { useEffect } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { PRIVY_APP_ID } from "@/lib/privy/config";
+import { initPosthog } from "@/lib/analytics/posthog";
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    initPosthog();
+  }, []);
   if (!PRIVY_APP_ID) return <>{children}</>;
   return (
     <PrivyProvider

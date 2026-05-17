@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { listMarketplaceServers } from "@/lib/chain/reads";
 import { MarketplaceClient } from "./marketplace-client";
 
 const categories = [
@@ -25,37 +25,41 @@ export default async function MarketplacePage({
   searchParams: Promise<{ q?: string; category?: string; sort?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
 
-  let query = supabase
-    .from("mcp_servers")
-    .select("*")
-    .eq("status", "active");
+  // S4-T12: read the indexer mirror (marketplace_servers view), not chain RPC.
+  const all = await listMarketplaceServers();
+  const q = params.q?.toLowerCase();
+  const filtered = all.filter((s) => {
+    if (
+      params.category &&
+      params.category !== "All" &&
+      s.category.toLowerCase() !== params.category.toLowerCase()
+    ) {
+      return false;
+    }
+    if (q) {
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        s.namespace.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
-  if (params.q) {
-    query = query.or(
-      `name.ilike.%${params.q}%,description.ilike.%${params.q}%,namespace.ilike.%${params.q}%`
-    );
-  }
-
-  if (params.category && params.category !== "All") {
-    query = query.eq("category", params.category);
-  }
-
-  switch (params.sort) {
-    case "newest":
-      query = query.order("created_at", { ascending: false });
-      break;
-    case "rating":
-      query = query.order("avg_rating", { ascending: false });
-      break;
-    case "popular":
-    default:
-      query = query.order("total_users", { ascending: false });
-      break;
-  }
-
-  const { data: servers } = await query;
+  // Map view rows into the shape MarketplaceClient renders.
+  const servers = filtered.map((s) => ({
+    id: s.objectId,
+    name: s.name,
+    namespace: s.namespace,
+    description: s.description,
+    category: s.category,
+    total_users: s.toolCount,
+    avg_rating: 0,
+    icon_url: null,
+    status: "active",
+    created_at: "",
+  }));
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>

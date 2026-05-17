@@ -12,6 +12,7 @@
  */
 
 import { serve } from '@hono/node-server';
+import { initSentry } from '@mcpxgg/shared';
 import { createApp } from './app.js';
 import { loadEnv } from './env.js';
 import { GasStation } from './gas-station.js';
@@ -19,6 +20,7 @@ import { createLogger } from './logger.js';
 import { createRealSuiBackend } from './sui/backend.js';
 
 async function main(): Promise<void> {
+  await initSentry('facilitator');
   const env = loadEnv();
   if (env.testMode) {
     throw new Error(

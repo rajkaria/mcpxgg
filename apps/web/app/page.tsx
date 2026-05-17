@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LiveTicker } from "@/components/LiveTicker";
 
 const steps = [
   {
@@ -58,7 +59,7 @@ const benefits = [
       </svg>
     ),
     title: "Pay only for what you use",
-    desc: "Credit-based pricing means you never pay for idle infrastructure. Scale up or down instantly.",
+    desc: "Per-call settlement in USDsui from your wallet — no subscriptions, no idle infrastructure, no lock-in.",
   },
   {
     icon: (
@@ -133,24 +134,36 @@ const useCases = [
 
 const plans = [
   {
-    name: "Free",
-    price: "₹0",
-    desc: "Get started",
-    features: ["50 credits/month", "3 servers", "Community support"],
-    highlight: false,
-  },
-  {
-    name: "Starter",
-    price: "₹999",
-    desc: "For developers",
-    features: ["500 credits/month", "10 servers", "Priority support", "Analytics"],
+    name: "Pay per call",
+    price: "USDsui",
+    desc: "Settle each tool call on-chain",
+    features: [
+      "No subscription — recharge your wallet",
+      "Set per-call & daily spend caps",
+      "Every call gets an on-chain receipt",
+    ],
     highlight: true,
   },
   {
-    name: "Pro",
-    price: "₹1999",
-    desc: "For power users",
-    features: ["2,500 credits/month", "Unlimited servers", "Dedicated support", "Team management"],
+    name: "Free tier",
+    price: "$1.00",
+    desc: "On the house to start",
+    features: [
+      "$1.00 USDsui bootstrap grant",
+      "First N calls per tool are free",
+      "No credit card, just a wallet",
+    ],
+    highlight: false,
+  },
+  {
+    name: "Developers",
+    price: "97.5%",
+    desc: "Your share of every call",
+    features: [
+      "Earn USDsui straight to your vault",
+      "2.5% platform take rate",
+      "Publish with one command",
+    ],
     highlight: false,
   },
 ];
@@ -243,8 +256,12 @@ export default function LandingPage() {
             </Link>
           </div>
 
+          <div className="animate-fade-in mt-6 flex justify-center">
+            <LiveTicker />
+          </div>
+
           <p className="animate-fade-in mt-6 text-sm" style={{ color: "var(--text-muted)", animationDelay: "400ms" }}>
-            Free tier includes 50 credits/month &middot; No credit card required
+            $1.00 USDsui bootstrap grant &middot; Connect a wallet, no credit card
           </p>
         </div>
 
@@ -501,7 +518,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-base leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
                 Send standard MCP requests to a single gateway URL. MCPX routes your tool calls
-                to the right server, handles auth, tracks credits, and returns results — all in one round trip.
+                to the right server, handles auth, settles the call on-chain in USDsui, and returns results — all in one round trip.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -579,10 +596,10 @@ export default function LandingPage() {
               Pricing
             </p>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              Simple, <span className="text-gradient">credit-based</span> pricing
+              Simple, <span className="text-gradient">usage-based</span> pricing
             </h2>
             <p className="text-lg" style={{ color: "var(--text-secondary)" }}>
-              Start free. Scale as you grow.
+              Pay per call in USDsui. No subscriptions. Earn directly to your wallet.
             </p>
           </div>
 
@@ -604,7 +621,6 @@ export default function LandingPage() {
                 <p className="text-sm mt-1 mb-6" style={{ color: "var(--text-muted)" }}>{plan.desc}</p>
                 <div className="flex items-baseline gap-1 mb-8">
                   <span className="text-5xl font-bold tracking-tight">{plan.price}</span>
-                  <span className="text-sm" style={{ color: "var(--text-muted)" }}>/month</span>
                 </div>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((f) => (

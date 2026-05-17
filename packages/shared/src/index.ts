@@ -28,3 +28,5 @@ export type {
 } from './validation/config-schema';
 
 export { validateConfig, VALIDATION_CONSTANTS } from './validation/config-schema';
+
+export { initSentry } from './observability';
