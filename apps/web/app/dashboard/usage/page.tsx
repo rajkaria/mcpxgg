@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { listReceipts, usdsui } from "@/lib/chain/reads";
 import { SessionBalance } from "@/components/SessionBalance";
 import { RechargeFlow } from "@/components/RechargeFlow";
+import { ClaimRefundButton } from "@/components/ClaimRefundButton";
 
 const WALRUS_AGG =
   process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR_URL ??
@@ -67,7 +68,14 @@ export default async function UsagePage() {
                 <td className="p-2 font-mono">
                   {r.namespace}_{r.toolName}
                 </td>
-                <td className="p-2">{r.status}</td>
+                <td className="p-2">
+                  {r.status}
+                  {r.refunded && (
+                    <span className="ml-1 text-xs text-emerald-400">
+                      (refunded {usdsui(r.refundAmountAtomic)})
+                    </span>
+                  )}
+                </td>
                 <td className="p-2">{usdsui(r.amountAtomic)} USDsui</td>
                 <td className="p-2 flex gap-2">
                   <Link className="underline" href={`/receipts/${r.id}`}>
@@ -92,6 +100,9 @@ export default async function UsagePage() {
                     >
                       blob
                     </a>
+                  )}
+                  {r.claimable && r.receiptObjectId && (
+                    <ClaimRefundButton receiptId={r.id} />
                   )}
                 </td>
               </tr>

@@ -19,6 +19,7 @@ import type {
   PlatformPause,
   QualityAttestation,
   RequestLogInsert,
+  UptoFinalization,
   ReviewRecord,
   ServerDeactivation,
   ServerUpdate,
@@ -65,7 +66,8 @@ export interface InMemoryState {
   tools: Map<string, ToolUpsert>;
   sessions: Map<string, SessionRow>;
   requestLog: RequestLogInsert[];
-  refunds: { receiptObjectId: string; amountAtomic: bigint; txDigest: string }[];
+  refunds: { receiptObjectId: string; amountAtomic: bigint; timestampMs: number; txDigest: string }[];
+  uptoFinalizations: UptoFinalization[];
   vaults: Map<string, VaultRow>;
   vaultClaims: VaultClaim[];
   platform: {
@@ -96,6 +98,7 @@ export function createInMemoryStorage(chainId: ChainId = 'sui'): Storage & { sta
     sessions: new Map(),
     requestLog: [],
     refunds: [],
+    uptoFinalizations: [],
     vaults: new Map(),
     vaultClaims: [],
     platform: {
@@ -222,8 +225,12 @@ export function createInMemoryStorage(chainId: ChainId = 'sui'): Storage & { sta
       }
     },
 
-    async markRequestRefunded(receiptObjectId, amountAtomic, txDigest): Promise<void> {
-      state.refunds.push({ receiptObjectId, amountAtomic, txDigest });
+    async markRequestRefunded(receiptObjectId, amountAtomic, timestampMs, txDigest): Promise<void> {
+      state.refunds.push({ receiptObjectId, amountAtomic, timestampMs, txDigest });
+    },
+
+    async finalizeUpto(u: UptoFinalization): Promise<void> {
+      state.uptoFinalizations.push(u);
     },
 
     async upsertVault(u: VaultUpsert): Promise<void> {

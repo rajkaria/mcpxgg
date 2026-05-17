@@ -35,6 +35,7 @@ import type {
   Storage,
   ToolRemoval,
   ToolUpsert,
+  UptoFinalization,
   VaultClaim,
   VaultUpsert,
 } from './storage.js';
@@ -195,15 +196,47 @@ export async function createSupabaseStorage(
       if (error) throw new Error(`insertRequestLog: ${error.message}`);
     },
 
-    async markRequestRefunded(receiptObjectId, refundAmountAtomic, txDigest): Promise<void> {
-      const { error } = await sb
+    async markRequestRefunded(receiptObjectId, refundAmountAtomic, timestampMs, txDigest): Promise<void> {
+      const { data, error } = await sb
         .from('request_log')
         .update({
           status: 'refunded',
+          refunded: true,
+          refund_amount_atomic: asString(refundAmountAtomic),
+          refunded_at: new Date().toISOString(),
+          refund_tx_digest: txDigest,
           response_meta: { refund_amount_atomic: asString(refundAmountAtomic), refund_tx_digest: txDigest },
         })
-        .eq('receipt_object_id', receiptObjectId);
+        .eq('receipt_object_id', receiptObjectId)
+        .select('payer_address')
+        .maybeSingle();
       if (error) throw new Error(`markRequestRefunded: ${error.message}`);
+
+      // Ledger the claim payout (migration 016 `insurance_payouts`, PK is the
+      // original receipt id so a re-indexed event is idempotent).
+      const { error: payoutErr } = await sb.from('insurance_payouts').upsert(
+        {
+          original_receipt_id: receiptObjectId,
+          payee_address: (data?.payer_address as string | undefined) ?? null,
+          refund_amount_atomic: asString(refundAmountAtomic),
+          timestamp_ms: timestampMs,
+          tx_digest: txDigest,
+        },
+        { onConflict: 'original_receipt_id' },
+      );
+      if (payoutErr) throw new Error(`markRequestRefunded(payout): ${payoutErr.message}`);
+    },
+
+    async finalizeUpto(u: UptoFinalization): Promise<void> {
+      const { error } = await sb
+        .from('request_log')
+        .update({
+          quoted_max_atomic: asString(u.quotedMaxAtomic),
+          actual_atomic: asString(u.actualAtomic),
+          unused_atomic: asString(u.unusedAtomic),
+        })
+        .eq('receipt_object_id', u.receiptObjectId);
+      if (error) throw new Error(`finalizeUpto: ${error.message}`);
     },
 
     async upsertVault(u: VaultUpsert): Promise<void> {

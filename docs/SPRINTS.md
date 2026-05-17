@@ -525,33 +525,33 @@ mainnet keystore, see `docs/BLOCKED.md` item 11.
 | **A2 — Pay-per-output streaming** | | | | |
 | S7-T01 | x402 `upto` scheme types in `packages/x402` | packages/x402 | S | Done |
 | S7-T02 | Facilitator `/settle` upto-mode: settles up to a quoted max; refunds delta on completion | apps/facilitator | L | Done |
-| S7-T03 | Move: `settlement::settle_call_upto` variant that accepts max amount + actual usage post-completion | contracts | M | ☐ |
+| S7-T03 | Move: `settlement::settle_call_upto` variant that accepts max amount + actual usage post-completion | contracts | M | Done |
 | S7-T04 | Gateway: streaming detection (`Accept: text/event-stream`), per-chunk metering, finalize on stream close | apps/gateway | XL | Done |
 | S7-T05 | `@mcpxgg/server` SDK: `tool.handler` can return an async iterator → SDK metering wraps each chunk | packages/sdk-server | L | Done |
 | S7-T06 | E2E test: streaming server call returns 5 chunks, settles for chunk count not max | tests | M | Done |
 | **A3 — SLA Staking + Auto-Slash** | | | | |
-| S7-T07 | `mcpx::staking::ServerStake` Move: developer locks USDsui as collateral, sla_tier (95/99/99.9), expiry | contracts | M | ☐ |
-| S7-T08 | `mcpx::staking::slash` callable by quality oracle multisig: slashes stake proportionally to SLA breach magnitude, transfers slashed USDsui to InsurancePool | contracts | M | ☐ |
-| S7-T09 | Quality oracle service computes hourly SLA compliance per staked server; triggers slashing when threshold breached for ≥2 windows | apps/quality-oracle | L | ✓ |
-| S7-T10 | `<StakingFlow />` UI in dev dashboard: lock stake, choose SLA tier, view slashed history | apps/web | M | ✓ |
-| S7-T11 | Server detail page shows "🔒 $X staked at 99% SLA" badge | apps/web | S | ✓ |
-| S7-T12 | Marketplace filter: "Servers with stake" toggle | apps/web | S | ✓ |
-| S7-T13 | E2E test: stake server → simulate downtime via test harness → verify slashing tx | tests | M | ☐ |
+| S7-T07 | `mcpx::staking::ServerStake` Move: developer locks USDsui as collateral, sla_tier (95/99/99.9), expiry | contracts | M | Done |
+| S7-T08 | `mcpx::staking::slash` callable by quality oracle multisig: slashes stake proportionally to SLA breach magnitude, transfers slashed USDsui to InsurancePool | contracts | M | Done |
+| S7-T09 | Quality oracle service computes hourly SLA compliance per staked server; triggers slashing when threshold breached for ≥2 windows | apps/quality-oracle | L | Done |
+| S7-T10 | `<StakingFlow />` UI in dev dashboard: lock stake, choose SLA tier, view slashed history | apps/web | M | Done |
+| S7-T11 | Server detail page shows "🔒 $X staked at 99% SLA" badge | apps/web | S | Done |
+| S7-T12 | Marketplace filter: "Servers with stake" toggle | apps/web | S | Done |
+| S7-T13 | E2E test: stake server → simulate downtime via test harness → verify slashing tx | tests | M | Done |
 | **A4 — Insurance Pool** | | | | |
-| S7-T14 | `mcpx::insurance::claim_for_failed_call` Move: anyone can submit a CallReceipt with `success: false` to claim back the call cost from InsurancePool, capped at pool balance | contracts | M | ☐ |
-| S7-T15 | Auto-claim integration in gateway: failed call response includes "Claim refund" link to call this fn from user wallet | apps/web | M | ☐ |
-| S7-T16 | InsurancePool dashboard for transparency at `/insurance`: balance, payouts to date, top contributors | apps/web | M | ☐ |
-| S7-T17 | Take-rate split now active: 250bps total = 50bps insurance + 200bps treasury; verify split correctness in settlement tests | contracts | M | ☐ |
-| S7-T18 | Insurance fund admin tools: top up from external sources (sponsor donations) | apps/web | S | ☐ |
-| S7-T19 | E2E test: simulate downtime call → user clicks Claim → InsurancePool balance decreases | tests | M | ☐ |
+| S7-T14 | `mcpx::insurance::claim_for_failed_call` Move: anyone can submit a CallReceipt with `success: false` to claim back the call cost from InsurancePool, capped at pool balance | contracts | M | Done |
+| S7-T15 | Auto-claim integration in gateway: failed call response includes "Claim refund" link to call this fn from user wallet | apps/web | M | Done |
+| S7-T16 | InsurancePool dashboard for transparency at `/insurance`: balance, payouts to date, top contributors | apps/web | M | Done |
+| S7-T17 | Take-rate split now active: 250bps total = 50bps insurance + 200bps treasury; verify split correctness in settlement tests | contracts | M | Done |
+| S7-T18 | Insurance fund admin tools: top up from external sources (sponsor donations) | apps/web | S | Done |
+| S7-T19 | E2E test: simulate downtime call → user clicks Claim → InsurancePool balance decreases | tests | M | Done |
 | **A6 — Embeddable widgets** | | | | |
-| S7-T20 | `packages/widget/`: web component (`<mcpx-call server tool prefill>`) with bundled wallet UI | packages/widget | XL | ☐ |
-| S7-T21 | Widget Privy integration (or fall back to bare wallet connect) | packages/widget | M | ☐ |
-| S7-T22 | Widget styling system: themeable via CSS vars; default and dark modes | packages/widget | M | ☐ |
-| S7-T23 | Widget published as `@mcpxgg/widget` on npm + CDN bundle | packages/widget | M | ☐ |
-| S7-T24 | Widget docs page at `apps/docs/embed` with live examples | apps/docs | M | ☐ |
-| S7-T25 | Embed examples in landing page `/` and in marketplace server detail pages | apps/web | M | ☐ |
-| S7-T26 | Demo: Notion / personal-site embed of `<mcpx-call server="walrus-search">` working with one user click | demo | M | ☐ |
+| S7-T20 | `packages/widget/`: web component (`<mcpx-call server tool prefill>`) with bundled wallet UI | packages/widget | XL | Done |
+| S7-T21 | Widget Privy integration (or fall back to bare wallet connect) | packages/widget | M | Done |
+| S7-T22 | Widget styling system: themeable via CSS vars; default and dark modes | packages/widget | M | Done |
+| S7-T23 | Widget published as `@mcpxgg/widget` on npm + CDN bundle | packages/widget | M | Done |
+| S7-T24 | Widget docs page at `apps/docs/embed` with live examples | apps/docs | M | Done |
+| S7-T25 | Embed examples in landing page `/` and in marketplace server detail pages | apps/web | M | Done |
+| S7-T26 | Demo: Notion / personal-site embed of `<mcpx-call server="walrus-search">` working with one user click | demo | M | Done |
 
 **Definition of Done.**
 - LLM-style streaming server (you can mock one) settles per-chunk and refunds correctly on early abort

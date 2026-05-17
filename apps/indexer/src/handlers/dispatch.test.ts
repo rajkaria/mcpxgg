@@ -235,6 +235,27 @@ describe('dispatch — settlement events', () => {
     assert.equal(storage.state.refunds.length, 1);
     assert.equal(storage.state.refunds[0]?.amountAtomic, 500_000n);
   });
+
+  it('records upto finalization against the receipt', async () => {
+    const storage = createInMemoryStorage();
+    const pubsub = new RecordingPubsub();
+    await dispatch(
+      makeEvent('UptoFinalized', {
+        receipt_id: '0xrcpt',
+        quoted_max_atomic: '1000000',
+        actual_atomic: '650000',
+        unused_atomic: '350000',
+        timestamp_ms: 0,
+      }),
+      { storage, pubsub },
+    );
+    assert.equal(storage.state.uptoFinalizations.length, 1);
+    const fin = storage.state.uptoFinalizations[0];
+    assert.equal(fin?.receiptObjectId, '0xrcpt');
+    assert.equal(fin?.quotedMaxAtomic, 1_000_000n);
+    assert.equal(fin?.actualAtomic, 650_000n);
+    assert.equal(fin?.unusedAtomic, 350_000n);
+  });
 });
 
 describe('dispatch — vault, treasury, insurance', () => {

@@ -27,3 +27,7 @@ markdown under `content/`:
   `SpendingIntent`, drive paid calls with `@mcpxgg/sdk`
   `client.callTool(..., { intentId })`, observe `IntentUsed`, and handle
   revocation.
+- [`content/embed.md`](./content/embed.md) — "Embed MCPX anywhere with
+  `<mcpx-call>`" (S7-T24): route `embed`. One-tag CDN embed, npm install,
+  attributes, CSS-custom-property theming, Privy/wallet fallback, and the
+  committed third-party demo page.

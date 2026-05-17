@@ -50,3 +50,18 @@ export function platformConfigId(): string {
   }
   return id;
 }
+
+/**
+ * Shared InsurancePool object id (S7-T15/T18: claim_for_failed_call /
+ * insurance::top_up argument). Same env name the quality-oracle uses
+ * (MCPX_INSURANCE_POOL_ID) so a deploy sets it once.
+ */
+export function insurancePoolId(): string {
+  const id = process.env.MCPX_INSURANCE_POOL_ID;
+  if (!id) {
+    throw new Error(
+      "Sui not configured: set MCPX_INSURANCE_POOL_ID (after S1-T17 deploy)",
+    );
+  }
+  return id;
+}

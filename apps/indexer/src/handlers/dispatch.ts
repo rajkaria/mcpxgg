@@ -21,7 +21,7 @@ import {
   handleSessionLimitsUpdated,
   handleSessionClosed,
 } from './session.js';
-import { handleCallSettled, handleRefundIssued } from './settlement.js';
+import { handleCallSettled, handleRefundIssued, handleUptoFinalized } from './settlement.js';
 import { handleVaultCreated, handleVaultAccrued, handleVaultClaimed } from './vault.js';
 import { handleTreasuryCollected, handleTreasuryWithdrawn } from './treasury.js';
 import { handleInsuranceCollected, handleInsurancePaid } from './insurance.js';
@@ -62,6 +62,7 @@ const TABLE: Record<EventType, Handler> = {
   SessionClosed: handleSessionClosed,
   CallSettled: handleCallSettled,
   RefundIssued: handleRefundIssued,
+  UptoFinalized: handleUptoFinalized,
   VaultCreated: handleVaultCreated,
   VaultAccrued: handleVaultAccrued,
   VaultClaimed: handleVaultClaimed,

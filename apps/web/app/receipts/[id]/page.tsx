@@ -11,6 +11,7 @@ import { createWalrusClient, walrusEnv, type SealEnvelope } from "@mcpxgg/walrus
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getReceipt, usdsui } from "@/lib/chain/reads";
 import { SealReceiptViewer } from "@/components/SealReceiptViewer";
+import { ClaimRefundButton } from "@/components/ClaimRefundButton";
 
 function isSealEnvelope(v: unknown): v is SealEnvelope {
   return (
@@ -78,6 +79,22 @@ export default async function ReceiptPage({
           receipt object: {receipt.receiptObjectId}
         </code>
       )}
+
+      {receipt.refunded ? (
+        <p className="mt-4 text-sm text-emerald-400">
+          This failed call was refunded {usdsui(receipt.refundAmountAtomic)}{" "}
+          USDsui from the insurance pool.
+        </p>
+      ) : receipt.claimable && receipt.receiptObjectId ? (
+        <div className="mt-4 rounded-lg border border-[var(--border)] p-4">
+          <p className="mb-2 text-sm">
+            This call failed. You can reclaim its cost (
+            {usdsui(receipt.amountAtomic)} USDsui) from the on-chain insurance
+            pool.
+          </p>
+          <ClaimRefundButton receiptId={receipt.id} />
+        </div>
+      ) : null}
 
       <h2 className="mt-6 mb-2 text-sm font-semibold">Archived payload</h2>
       {blobError && (

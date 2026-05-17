@@ -273,6 +273,10 @@ export interface Database {
           insurance_share_atomic: number | string | null;
           receipt_blob_id: string | null;
           intent_object_id: string | null;
+          refunded: boolean | null;
+          refund_amount_atomic: number | string | null;
+          refunded_at: string | null;
+          refund_tx_digest: string | null;
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
@@ -518,6 +522,61 @@ export interface Database {
           reason: string;
           slashed_at: string;
           tx_digest: string;
+        };
+        Relationships: [];
+      };
+      platform_state: {
+        Row: {
+          chain_id: string;
+          package_id: string | null;
+          config_object_id: string | null;
+          registry_object_id: string | null;
+          treasury_object_id: string | null;
+          insurance_object_id: string | null;
+          take_rate_bps: number;
+          insurance_bps: number;
+          treasury_balance_atomic: number | string;
+          insurance_balance_atomic: number | string;
+          treasury_lifetime_atomic: number | string;
+          insurance_lifetime_atomic: number | string;
+          insurance_paid_atomic: number | string;
+          last_tx_digest: string | null;
+          last_synced_at: string | null;
+          updated_at: string | null;
+        };
+        Relationships: [];
+      };
+      insurance_payouts: {
+        Row: {
+          original_receipt_id: string;
+          chain_id: string;
+          payee_address: string | null;
+          refund_amount_atomic: number | string;
+          timestamp_ms: number | string;
+          tx_digest: string;
+          indexed_at: string | null;
+        };
+        Relationships: [];
+      };
+      insurance_contributions: {
+        Row: {
+          id: number;
+          chain_id: string;
+          contributor_address: string | null;
+          amount_atomic: number | string;
+          source: string;
+          timestamp_ms: number | string;
+          tx_digest: string;
+          indexed_at: string | null;
+        };
+        Relationships: [];
+      };
+      insurance_top_contributors: {
+        Row: {
+          contributor_address: string | null;
+          total_atomic: number | string;
+          contribution_count: number | string;
+          last_contributed_ms: number | string | null;
         };
         Relationships: [];
       };

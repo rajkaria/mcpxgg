@@ -6,6 +6,7 @@ import { getMarketplaceServer, getServerStake, usdsui } from "@/lib/chain/reads"
 import { QualityBadge } from "@/components/QualityBadge";
 import { StakeBadge } from "@/components/StakeBadge";
 import { DemoCallButton } from "@/components/DemoCallButton";
+import { EmbedWidget } from "@/components/EmbedWidget";
 import { ServerDetailClient } from "./server-detail-client";
 
 const WALRUS_AGG =
@@ -307,6 +308,29 @@ export default async function ServerDetailPage({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </section>
+        )}
+
+        {/* Embed widget (S7-T25): the live <mcpx-call> for this server. */}
+        {((tools as any) || []).length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold mb-2">Embed this server</h2>
+            <p
+              className="text-sm mb-4"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Drop this server's tool into any page with one script tag. Every
+              call settles on-chain in USDsui.{" "}
+              <Link href="/docs/embed" className="underline">
+                Embed docs ↗
+              </Link>
+            </p>
+            <div className="max-w-md">
+              <EmbedWidget
+                server={s.namespace}
+                tool={((tools as any)[0] as any).tool_name}
+              />
             </div>
           </section>
         )}

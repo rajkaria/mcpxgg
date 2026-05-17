@@ -15,6 +15,8 @@ module mcpx::e2e_tests;
 
 use mcpx::admin;
 use mcpx::insurance;
+use mcpx::quality;
+use mcpx::staking;
 use mcpx::registry::{Self, Server};
 use mcpx::session::{Self, Session};
 use mcpx::settlement::{Self, CallReceipt};
@@ -193,6 +195,186 @@ fun full_lifecycle_publish_session_settle_claim_close() {
     ts::return_shared(server);
     ts::return_shared(dev_vault);
     ts::return_shared(session_obj);
+    ts::return_shared(treasury_obj);
+    ts::return_shared(insurance_obj);
+    ts::return_shared(registry_obj);
+    ts::return_shared(config);
+    registry::destroy_cap_for_testing(owner_cap);
+    session::destroy_key_for_testing(session_key);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+/// S7-T13 — full SLA-staking lifecycle: a dev publishes a server and posts an
+/// SLA stake; the quality oracle observes a downtime breach and slashes the
+/// stake; the slashed USDsui lands in the InsurancePool.
+#[test]
+fun e2e_stake_then_downtime_slash_to_insurance() {
+    let mut sc = ts::begin(ADMIN);
+    let mut clk = clock::create_for_testing(sc.ctx());
+    clock::increment_for_testing(&mut clk, 1_700_000_000_000);
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    admin::init_for_testing(sc.ctx());
+    sc.next_tx(ADMIN);
+    let config = sc.take_shared<admin::PlatformConfig>();
+    insurance::initialize<SUI>(&admin_cap, sc.ctx());
+    registry::init_for_testing(sc.ctx());
+    // The oracle's slashing authority (held by the quality-oracle service).
+    let oracle_cap = quality::mint_oracle_cap_for_testing(sc.ctx());
+
+    sc.next_tx(ADMIN);
+    let mut insurance_obj = sc.take_shared<insurance::InsurancePool<SUI>>();
+    let mut registry_obj = sc.take_shared<registry::NamespaceRegistry>();
+
+    // DEV publishes a server.
+    sc.next_tx(DEV);
+    let owner_cap = registry::publish_server(
+        &mut registry_obj,
+        b"sla-server",
+        b"https://sla.example",
+        b"meta-blob",
+        b"search",
+        &clk,
+        sc.ctx(),
+    );
+    sc.next_tx(DEV);
+    let server = sc.take_shared<Server>();
+    let server_id = object::id(&server);
+
+    // DEV posts a 50_000_000 stake committing to 99.00% SLA.
+    sc.next_tx(DEV);
+    let stake_coin = coin::mint_for_testing<SUI>(50_000_000, sc.ctx());
+    let stake_id = staking::post<SUI>(
+        &config,
+        server_id,
+        stake_coin,
+        9_900,
+        86_400,
+        1_000,
+        &clk,
+        sc.ctx(),
+    );
+
+    sc.next_tx(DEV);
+    let mut stake = sc.take_shared<staking::ServerStake<SUI>>();
+    assert!(object::id(&stake) == stake_id, 0);
+    assert!(staking::amount(&stake) == 50_000_000, 1);
+    assert!(insurance::balance_value(&insurance_obj) == 0, 2);
+
+    // Oracle observed ≥2 breach windows (uptime 96% vs committed 99%) and
+    // slashes proportionally to the shortfall: ~3.03% of stake ≈ 1_515_000.
+    sc.next_tx(ADMIN);
+    staking::slash(
+        &oracle_cap,
+        &mut stake,
+        &mut insurance_obj,
+        1_515_000,
+        b"sla_breach: uptime 9600 < committed 9900 for 2 windows",
+        &clk,
+    );
+
+    assert!(staking::amount(&stake) == 48_485_000, 3);
+    assert!(staking::lifetime_slashed(&stake) == 1_515_000, 4);
+    assert!(insurance::balance_value(&insurance_obj) == 1_515_000, 5);
+
+    ts::return_shared(stake);
+    ts::return_shared(server);
+    ts::return_shared(insurance_obj);
+    ts::return_shared(registry_obj);
+    ts::return_shared(config);
+    registry::destroy_cap_for_testing(owner_cap);
+    quality::destroy_oracle_cap_for_testing(oracle_cap);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    clock::destroy_for_testing(clk);
+    sc.end();
+}
+
+/// S7-T19 — full insurance-claim lifecycle: a user makes a call that fails;
+/// they submit the soulbound failed-call receipt to reclaim the cost from the
+/// InsurancePool, and the pool balance decreases by the refunded amount.
+#[test]
+fun e2e_failed_call_claim_decreases_insurance_pool() {
+    let mut sc = ts::begin(ADMIN);
+    let mut clk = clock::create_for_testing(sc.ctx());
+    clock::increment_for_testing(&mut clk, 1_700_000_000_000);
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    admin::init_for_testing(sc.ctx());
+    sc.next_tx(ADMIN);
+    let config = sc.take_shared<admin::PlatformConfig>();
+    treasury::initialize<SUI>(&admin_cap, sc.ctx());
+    insurance::initialize<SUI>(&admin_cap, sc.ctx());
+    registry::init_for_testing(sc.ctx());
+
+    sc.next_tx(ADMIN);
+    let mut treasury_obj = sc.take_shared<treasury::PlatformTreasury<SUI>>();
+    let mut insurance_obj = sc.take_shared<insurance::InsurancePool<SUI>>();
+    let mut registry_obj = sc.take_shared<registry::NamespaceRegistry>();
+
+    // Sponsor pre-funds the pool so it can cover claims (S7-T18 path).
+    insurance::top_up<SUI>(&mut insurance_obj, coin::mint_for_testing<SUI>(1_000_000, sc.ctx()));
+    assert!(insurance::balance_value(&insurance_obj) == 1_000_000, 0);
+
+    sc.next_tx(DEV);
+    let owner_cap = registry::publish_server(
+        &mut registry_obj,
+        b"flaky-server",
+        b"https://flaky.example",
+        b"meta-blob",
+        b"search",
+        &clk,
+        sc.ctx(),
+    );
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(
+        &mut server, &owner_cap, b"query", b"d", b"s", 1_000, 0, 30, &clk,
+    );
+    vault::create<SUI>(sc.ctx());
+    sc.next_tx(DEV);
+    let mut dev_vault = sc.take_shared<DeveloperVault<SUI>>();
+
+    // USER funds a session and makes a call that the server fails.
+    sc.next_tx(USER);
+    let session_key = session::create<SUI>(
+        coin::mint_for_testing<SUI>(100_000, sc.ctx()),
+        50_000, 500_000, vector[], 0, &clk, sc.ctx(),
+    );
+    sc.next_tx(USER);
+    let mut session_obj = sc.take_shared<Session<SUI>>();
+    settlement::settle_call<SUI>(
+        &config, &mut session_obj, &server, &mut dev_vault,
+        &mut treasury_obj, &mut insurance_obj,
+        10_000, b"query", b"log-blob-fail", false, &clk, sc.ctx(),
+    );
+    // Failed call still skimmed its 50-atomic insurance share.
+    let pool_before = insurance::balance_value(&insurance_obj);
+    assert!(pool_before == 1_000_050, 1);
+
+    // USER claims the failed call's cost back from the pool.
+    sc.next_tx(USER);
+    let mut receipt = sc.take_from_address<CallReceipt>(USER);
+    let refunded = settlement::claim_for_failed_call<SUI>(
+        &mut receipt, &mut insurance_obj, &clk, sc.ctx(),
+    );
+    assert!(refunded == 10_000, 2);
+    assert!(settlement::receipt_refunded(&receipt), 3);
+    assert!(insurance::balance_value(&insurance_obj) == pool_before - 10_000, 4);
+    settlement::destroy_receipt_for_testing(receipt);
+
+    // The refund coin landed with USER.
+    sc.next_tx(USER);
+    {
+        let refund = sc.take_from_address<coin::Coin<SUI>>(USER);
+        assert!(coin::value(&refund) == 10_000, 5);
+        coin::burn_for_testing(refund);
+    };
+
+    ts::return_shared(session_obj);
+    ts::return_shared(server);
+    ts::return_shared(dev_vault);
     ts::return_shared(treasury_obj);
     ts::return_shared(insurance_obj);
     ts::return_shared(registry_obj);

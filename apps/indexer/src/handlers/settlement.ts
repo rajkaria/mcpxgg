@@ -1,6 +1,8 @@
 import type { Handler } from './dispatch.js';
 import { asAddress, asBigint, asBoolean, asNumber, asString, asUtf8 } from './parse.js';
 
+const asOptNumber = (v: unknown): number => (v == null ? 0 : asNumber(v, 'timestamp_ms'));
+
 export const handleCallSettled: Handler = async (event, ctx) => {
   const f = event.parsedJson;
   await ctx.storage.insertRequestLog({
@@ -24,6 +26,18 @@ export const handleRefundIssued: Handler = async (event, ctx) => {
   await ctx.storage.markRequestRefunded(
     asString(f.original_receipt_id, 'original_receipt_id'),
     asBigint(f.refund_amount_atomic, 'refund_amount_atomic'),
+    asOptNumber(f.timestamp_ms),
     event.txDigest,
   );
+};
+
+export const handleUptoFinalized: Handler = async (event, ctx) => {
+  const f = event.parsedJson;
+  await ctx.storage.finalizeUpto({
+    receiptObjectId: asString(f.receipt_id, 'receipt_id'),
+    quotedMaxAtomic: asBigint(f.quoted_max_atomic, 'quoted_max_atomic'),
+    actualAtomic: asBigint(f.actual_atomic, 'actual_atomic'),
+    unusedAtomic: asBigint(f.unused_atomic, 'unused_atomic'),
+    txDigest: event.txDigest,
+  });
 };

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LiveTicker } from "@/components/LiveTicker";
+import { EmbedWidget } from "@/components/EmbedWidget";
 
 const steps = [
   {
@@ -172,6 +173,7 @@ const footerLinks = {
   Product: [
     { label: "Marketplace", href: "/marketplace" },
     { label: "Pricing", href: "/pricing" },
+    { label: "Insurance Pool", href: "/insurance" },
   ],
   Company: [
     { label: "About", href: "/about" },
@@ -640,6 +642,45 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <div className="divider-gradient" />
+
+      {/* ====== EMBED ANYWHERE (S7-T25) ====== */}
+      <section className="py-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              Embed it <span className="text-gradient">anywhere</span>
+            </h2>
+            <p
+              className="text-lg max-w-xl mx-auto"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              One script tag, one element. Drop a live, on-chain-settled MCP
+              tool call into any page — a blog, a Notion embed, your docs. This
+              widget below is the real thing.
+            </p>
+          </div>
+          <div className="max-w-md mx-auto">
+            <EmbedWidget
+              server="walrus-search"
+              tool="query"
+              prefill={{ q: "sui move" }}
+              label="Search Walrus"
+            />
+          </div>
+          <p
+            className="text-center text-sm mt-6"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Full guide at{" "}
+            <Link href="/docs/embed" className="underline">
+              the embed docs
+            </Link>
+            .
+          </p>
         </div>
       </section>
 

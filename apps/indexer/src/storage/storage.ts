@@ -99,6 +99,14 @@ export interface RequestLogInsert {
   txDigest: string;
 }
 
+export interface UptoFinalization {
+  receiptObjectId: string;
+  quotedMaxAtomic: bigint;
+  actualAtomic: bigint;
+  unusedAtomic: bigint;
+  txDigest: string;
+}
+
 // ─── Vault mirror ────────────────────────────────────────────────────────
 
 export interface VaultUpsert {
@@ -260,7 +268,13 @@ export interface Storage {
   closeSession(sessionObjectId: string, txDigest: string): Promise<void>;
 
   insertRequestLog(u: RequestLogInsert): Promise<void>;
-  markRequestRefunded(receiptObjectId: string, refundAmountAtomic: bigint, txDigest: string): Promise<void>;
+  markRequestRefunded(
+    receiptObjectId: string,
+    refundAmountAtomic: bigint,
+    timestampMs: number,
+    txDigest: string,
+  ): Promise<void>;
+  finalizeUpto(u: UptoFinalization): Promise<void>;
 
   upsertVault(u: VaultUpsert): Promise<void>;
   applyVaultClaim(u: VaultClaim): Promise<void>;

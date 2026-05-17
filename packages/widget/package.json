@@ -1,0 +1,43 @@
+{
+  "name": "@mcpxgg/widget",
+  "version": "0.1.0",
+  "private": false,
+  "license": "Apache-2.0",
+  "description": "Framework-agnostic <mcpx-call> Web Component: call any MCP server tool through the public mcpxgg gateway with a bundled minimal wallet UI, themeable, Shadow-DOM isolated. Wired in Sprint 7 (S7-T20..T26).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "examples",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mcpx-widget.js": "./dist/mcpx-widget.js",
+    "./mcpx-widget.esm.js": "./dist/mcpx-widget.esm.js"
+  },
+  "unpkg": "./dist/mcpx-widget.js",
+  "jsdelivr": "./dist/mcpx-widget.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle.mjs",
+    "lint": "echo 'widget: lint placeholder'",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcpxgg/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "esbuild": "^0.24.0"
+  }
+}

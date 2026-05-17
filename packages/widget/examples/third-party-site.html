@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jane's Notebook — a totally unrelated personal site</title>
+    <style>
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        max-width: 680px;
+        margin: 64px auto;
+        padding: 0 20px;
+        color: #1a1a1a;
+        line-height: 1.7;
+      }
+      h1 { font-size: 2rem; }
+      .post { margin: 40px 0; }
+      .embed { margin: 28px 0; }
+      footer { margin-top: 64px; color: #888; font-size: 0.85rem; }
+    </style>
+
+    <!--
+      S7-T26 demo: this file pretends to be a random third-party blog
+      (think a Notion page or a personal site). The ONLY mcpx-specific
+      thing is the one script tag below + one <mcpx-call> element.
+
+      In production you'd point src at the CDN:
+        https://unpkg.com/@mcpxgg/widget/dist/mcpx-widget.esm.js
+      For this committed offline demo we load the locally-built bundle so
+      `pnpm --filter @mcpxgg/widget build && open this file` just works.
+    -->
+    <script type="module" src="../dist/mcpx-widget.esm.js"></script>
+  </head>
+  <body>
+    <h1>Jane's Notebook</h1>
+    <p><em>Notes on Sui, agents, and whatever else.</em></p>
+
+    <article class="post">
+      <h2>Searching Walrus from a static page</h2>
+      <p>
+        I dropped MCPX's embeddable widget into this post. Click the button
+        and it runs the <code>walrus-search</code> server's <code>query</code>
+        tool live, settles the call on-chain in USDsui, and links the receipt
+        — all without me wiring up a backend.
+      </p>
+
+      <div class="embed">
+        <!-- One element. That's the whole integration. -->
+        <mcpx-call
+          server="walrus-search"
+          tool="query"
+          prefill='{"q":"sui move"}'
+          theme="light"
+          label="Search Walrus"
+        ></mcpx-call>
+      </div>
+
+      <p>
+        Same widget, dark theme, and a host-branded accent via a plain CSS
+        custom property:
+      </p>
+
+      <div class="embed">
+        <mcpx-call
+          server="walrus-search"
+          tool="query"
+          prefill='{"q":"on-chain receipts"}'
+          theme="dark"
+          style="--mcpx-accent:#16a34a"
+        ></mcpx-call>
+      </div>
+    </article>
+
+    <footer>
+      Not affiliated with MCPX. Widget is open source —
+      <a href="https://mcpx.gg/docs/embed">mcpx.gg/docs/embed</a>.
+    </footer>
+  </body>
+</html>

@@ -23,6 +23,7 @@ export type EventType =
   // Settlement
   | 'CallSettled'
   | 'RefundIssued'
+  | 'UptoFinalized'
   // Vault
   | 'VaultCreated'
   | 'VaultAccrued'
@@ -61,6 +62,7 @@ export const ALL_EVENT_TYPES: readonly EventType[] = [
   'SessionClosed',
   'CallSettled',
   'RefundIssued',
+  'UptoFinalized',
   'VaultCreated',
   'VaultAccrued',
   'VaultClaimed',

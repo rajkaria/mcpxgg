@@ -55,6 +55,30 @@ export interface ReceiptRow {
   receiptObjectId: string | null;
   receiptBlobId: string | null;
   createdAt: string;
+  /** S7-T15: failed-call refund state (mirrored from RefundIssued). */
+  refunded: boolean;
+  refundAmountAtomic: bigint;
+  /** A failed call is claimable from insurance iff !success && !refunded. */
+  claimable: boolean;
+}
+
+function mapReceipt(d: Record<string, unknown>): ReceiptRow {
+  const status = String(d.status);
+  const refunded = Boolean(d.refunded);
+  return {
+    id: String(d.id),
+    toolName: String(d.tool_name),
+    namespace: String(d.namespace),
+    status,
+    amountAtomic: toBig(d.amount_atomic as string),
+    txDigest: (d.tx_digest as string) ?? null,
+    receiptObjectId: (d.receipt_object_id as string) ?? null,
+    receiptBlobId: (d.receipt_blob_id as string) ?? null,
+    createdAt: String(d.created_at),
+    refunded,
+    refundAmountAtomic: toBig(d.refund_amount_atomic as string),
+    claimable: status !== "success" && !refunded,
+  };
 }
 
 export async function listReceipts(
@@ -62,25 +86,15 @@ export async function listReceipts(
   limit = 100,
 ): Promise<ReceiptRow[]> {
   const sb = createAdminClient();
+  // `*` (not a named projection) so this still works pre-migration-015 —
+  // the refund columns are added by a parallel workstream's deploy.
   const { data } = (await sb
     .from("request_log")
-    .select(
-      "id, tool_name, namespace, status, amount_atomic, tx_digest, receipt_object_id, receipt_blob_id, created_at",
-    )
+    .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit)) as { data: Array<Record<string, unknown>> | null };
-  return (data ?? []).map((r) => ({
-    id: String(r.id),
-    toolName: String(r.tool_name),
-    namespace: String(r.namespace),
-    status: String(r.status),
-    amountAtomic: toBig(r.amount_atomic as string),
-    txDigest: (r.tx_digest as string) ?? null,
-    receiptObjectId: (r.receipt_object_id as string) ?? null,
-    receiptBlobId: (r.receipt_blob_id as string) ?? null,
-    createdAt: String(r.created_at),
-  }));
+  return (data ?? []).map(mapReceipt);
 }
 
 export async function getReceipt(
@@ -90,24 +104,11 @@ export async function getReceipt(
   const sb = createAdminClient();
   const { data } = (await sb
     .from("request_log")
-    .select(
-      "id, tool_name, namespace, status, amount_atomic, tx_digest, receipt_object_id, receipt_blob_id, created_at",
-    )
+    .select("*")
     .eq("user_id", userId)
     .eq("id", receiptId)
     .maybeSingle()) as { data: Record<string, unknown> | null };
-  if (!data) return null;
-  return {
-    id: String(data.id),
-    toolName: String(data.tool_name),
-    namespace: String(data.namespace),
-    status: String(data.status),
-    amountAtomic: toBig(data.amount_atomic as string),
-    txDigest: (data.tx_digest as string) ?? null,
-    receiptObjectId: (data.receipt_object_id as string) ?? null,
-    receiptBlobId: (data.receipt_blob_id as string) ?? null,
-    createdAt: String(data.created_at),
-  };
+  return data ? mapReceipt(data) : null;
 }
 
 export interface MarketplaceServer {
@@ -626,4 +627,99 @@ export async function listCurrentFeatured(): Promise<FeaturedRow[]> {
   if (rows.length === 0) return [];
   const latestWeek = rows[0]!.weekStart;
   return rows.filter((r) => r.weekStart === latestWeek);
+}
+
+// ─── S7-T16: insurance pool transparency dashboard (mirror reads only) ────
+
+export interface InsuranceOverview {
+  /** Live pool balance. */
+  balanceAtomic: bigint;
+  /** All-time inflow (take-rate + sponsor top-ups + slashes). */
+  lifetimeCollectedAtomic: bigint;
+  /** All-time refunds paid out for failed calls. */
+  lifetimePaidAtomic: bigint;
+  poolObjectId: string | null;
+}
+
+// The indexer keeps `platform_state`.insurance_balance_atomic /
+// insurance_lifetime_atomic / insurance_paid_atomic in sync from
+// InsuranceCollected/InsurancePaid events (apps/indexer handlers/insurance.ts).
+// The web only reads.
+export async function getInsuranceOverview(): Promise<InsuranceOverview> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("platform_state")
+    .select(
+      "insurance_object_id, insurance_balance_atomic, insurance_lifetime_atomic, insurance_paid_atomic",
+    )
+    .eq("chain_id", "sui")
+    .maybeSingle()) as { data: Record<string, unknown> | null };
+  return {
+    balanceAtomic: toBig(data?.insurance_balance_atomic as string),
+    lifetimeCollectedAtomic: toBig(data?.insurance_lifetime_atomic as string),
+    lifetimePaidAtomic: toBig(data?.insurance_paid_atomic as string),
+    poolObjectId: (data?.insurance_object_id as string) ?? null,
+  };
+}
+
+export interface InsurancePayoutRow {
+  originalReceiptId: string;
+  payeeAddress: string | null;
+  refundAmountAtomic: bigint;
+  timestampMs: number;
+  txDigest: string;
+}
+
+// Rows here are mirrored 1:1 from on-chain RefundIssued events into
+// `insurance_payouts` by the indexer (handlers/settlement.ts → storage
+// markRequestRefunded, migration 016). Indexer-written only.
+export async function listInsurancePayouts(
+  limit = 25,
+): Promise<InsurancePayoutRow[]> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("insurance_payouts")
+    .select(
+      "original_receipt_id, payee_address, refund_amount_atomic, timestamp_ms, tx_digest",
+    )
+    .order("timestamp_ms", { ascending: false })
+    .limit(limit)) as { data: Array<Record<string, unknown>> | null };
+  return (data ?? []).map((r) => ({
+    originalReceiptId: String(r.original_receipt_id),
+    payeeAddress: (r.payee_address as string) ?? null,
+    refundAmountAtomic: toBig(r.refund_amount_atomic as string),
+    timestampMs: Number(r.timestamp_ms ?? 0),
+    txDigest: String(r.tx_digest ?? ""),
+  }));
+}
+
+export interface InsuranceContributorRow {
+  contributorAddress: string;
+  totalAtomic: bigint;
+  contributionCount: number;
+  lastContributedMs: number;
+}
+
+// `insurance_top_contributors` rolls up `insurance_contributions`. NOTE: the
+// on-chain InsuranceCollected event carries only an amount (no contributor
+// address), so named-contributor attribution is not derivable from events
+// today — this view stays empty until a contributor-bearing event exists.
+// The page degrades gracefully to an empty list.
+export async function listInsuranceTopContributors(
+  limit = 15,
+): Promise<InsuranceContributorRow[]> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("insurance_top_contributors")
+    .select(
+      "contributor_address, total_atomic, contribution_count, last_contributed_ms",
+    )
+    .order("total_atomic", { ascending: false })
+    .limit(limit)) as { data: Array<Record<string, unknown>> | null };
+  return (data ?? []).map((r) => ({
+    contributorAddress: String(r.contributor_address),
+    totalAtomic: toBig(r.total_atomic as string),
+    contributionCount: Number(r.contribution_count ?? 0),
+    lastContributedMs: Number(r.last_contributed_ms ?? 0),
+  }));
 }
