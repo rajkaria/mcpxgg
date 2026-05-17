@@ -66,40 +66,38 @@ This is a real product, not a hackathon throwaway. Tests for every Move module. 
 
 ---
 
-## Session Context (Last updated: 2026-05-17 18:41)
+## Session Context (Last updated: 2026-05-18 00:10)
 
 ### Current State
-- **Sprints 0–6 complete and on `origin/main`.** Remote `main` = `7c003f8` (S6). GitHub repo live: https://github.com/rajkaria/mcpxgg
-- Verification all green: `sui move test` **77/77**, `pnpm turbo run typecheck` exit 0, `pnpm turbo run test` **24/24 tasks**, `pnpm --filter @mcpxgg/web build` ✓.
-- **Sprint 6 shipped 24/24 code tasks.** Spending Intents (contract→indexer→gateway→SDK→UI), quality oracle service, anchor servers #4 (`walrus-store`) & #5 (`sui-identity`), Bloomberg `/live` page, abuse detection, demo-call, low-balance alert, revenue calculator, featured-rotation admin.
-- **Only S6-T10 / S6-T13 remain** (mainnet deploy of the 2 new anchor servers) — blocked on mainnet keystore (see `docs/BLOCKED.md` item 11). Code/Docker/fly are deploy-ready.
-- ⚠️ **Local `main` (primary worktree `/Users/rajkaria/Projects/mcpxgg`) is still at S5 (`32db015`)** — remote is ahead. Run `git pull --ff-only` there to sync (clean fast-forward, no conflicts). This worktree's branch `claude/gracious-poincare-09ddde` is pushed.
+- **Sprints 0–7 complete on branch `claude/modest-swartz-dcdccc`.** Two S7 commits: `17b0b49` (part 1), `7023220` (part 2). NOT yet pushed/merged to `origin/main` (remote still at `7c003f8` S6). Next session: push this branch + fast-forward `main`.
+- Verification all green: `sui move test` **85/85**, `pnpm turbo run typecheck` **28/28**, `pnpm turbo run test` **26/26**, `pnpm --filter @mcpxgg/web build` ✓.
+- **Sprint 7 shipped all 26 tasks** (docs/SPRINTS.md S7 table all `Done`). A2 pay-per-output streaming, A3 SLA staking + auto-slash, A4 insurance pool + claims, A6 embeddable widget. Plus 2 new E2E lifecycles + indexer wiring.
+- **S6-T10/T13 still the only blocked items** (mainnet deploy of walrus-store/sui-identity) — BLOCKED.md item 11, mainnet keystore, not code. Don't retry.
+- ⚠️ Local `main` (primary worktree) still at S5 `32db015`; remote at S6 `7c003f8`; this branch is S7. Sync chain: push branch → ff `main`.
 
-### Recent Changes (Sprint 6, commit 7c003f8 — 112 files)
-- **Contracts:** `intent.move` gained `per_call_cap_atomic` + `allowed_categories`; `settlement.move` added `settle_call_with_intent<T>` via shared private `settle_inner<T>` (zero dup, `settle_call` unchanged signature); `events.move` `IntentCreated` now carries `per_call_cap_atomic`. New `contracts/tests/intent_tests.move` + extended `settlement_tests.move`/`stubs_tests.move`.
-- **Indexer:** `handlers/intent.ts` + storage persist per-call cap; new `apps/indexer/src/abuse.ts` (3σ flagging) + test; `runner.ts` periodic abuse hook; `pubsub.ts` LPUSHes capped `mcpx:live:log` for SSE.
-- **New `apps/quality-oracle/`** package: UTC-anchored 6h windows, score = `0.5·uptime + 0.3·(1−err) + 0.2·latency_score` (latency_score = clamp(1−p95/2000,0,1)); signs `mcpx::quality::attest` via `@mcpxgg/chain` only. 17 tests.
-- **New servers:** `servers/walrus-store/` (tools upload/retrieve/metadata/list, 13 tests) + `servers/sui-identity/` (resolve_address/resolve_name/verify_zklogin/address_reputation, 17 tests). Both offline-by-default, Docker+fly deploy-ready.
-- **Web (apps/web):** `app/dashboard/intents/` + `components/IntentManager.tsx`; `app/live/` (`live-terminal.tsx`, `opengraph-image.tsx`, `api/live/stream` SSE, `api/live/metrics`); `components/QualityBadge.tsx`; `components/DemoCallButton.tsx` + `api/demo-call`; `components/LowBalanceBanner.tsx` + `api/alerts/low-balance`; `components/RevenueCalculator.tsx`; `app/dashboard/admin/featured/` + `api/admin/featured` + `lib/auth/admin.ts`.
-- **SDK/gateway/facilitator:** `@mcpxgg/sdk` `callTool(name,args,{intentId,category})` + `X-Mcpx-Intent-Id`/`X-Mcpx-Category` headers; new `apps/gateway/src/intent.ts` (8 `intent_*` error codes) → facilitator builds `settle_call_with_intent` PTB. `apps/docs/content/building-an-autonomous-agent.md`.
-- **Migrations:** `010_quality_attestations.sql`, `011_intents_staking.sql` (intents per-call/category cols + `server_stakes` for S7 + `abuse_flags`), `012_featured_rotation.sql` (app-owned, NOT mirror), `013_intents_gateway_read.sql` (read view).
-- **`packages/chain`:** `buildCreateIntentTx`/`buildRevokeIntentTx`/`buildAttestQualityTx` tx-builders + `addressFromPrivateKey` signer helper.
-- **`packages/shared`:** new DB row types + exports; new `economics.ts` (take-rate constants, ADR-004).
-- **Pre-existing bug fixes (boil-the-ocean):** `packages/walrus/src/*.ts` relative imports made extensionless (was `.js`-specifier, broke Turbopack — now matches monorepo `moduleResolution: Bundler` convention); `apps/web/lib/supabase/client.ts` env fallbacks so static prerender doesn't crash without secrets; `apps/web/next.config.ts` added `transpilePackages`.
+### Recent Changes (Sprint 7, commits 17b0b49 + 7023220)
+- **Contracts:** `settlement::settle_call_upto[_with_intent]<T>` (meters actual ≤ quoted max, implicit refund of unused delta); `settlement::claim_for_failed_call<T>` (soulbound-receipt payer reclaims failed-call cost from InsurancePool, once, capped at pool bal); `insurance::pay_claim` pkg fn; `events::UptoFinalized`; explicit 50/200 bps split test. staking `post/top_up/withdraw/slash` were already complete (S1-expanded). 85/85 Move tests (settlement_tests + e2e_tests extended).
+- **packages/chain:** `buildPostStakeTx/buildTopUpStakeTx/buildWithdrawStakeTx/buildSlashStakeTx/buildClaimFailedCallTx/buildTopUpInsuranceTx` + `SLA_TIER_UPTIME_X100`.
+- **A2:** `@mcpxgg/x402` `upto` scheme types+wire; facilitator scheme dispatch + upto PTB branches; gateway SSE detection + `StreamMeter` finalize-on-close (handles abort); `@mcpxgg/server` async-iterator handlers (back-compat). Streaming E2E in `apps/gateway/src/stream.test.ts`.
+- **A3:** `apps/quality-oracle` SLA compliance + auto-slash after ≥2 breach windows (slash ∝ uptime shortfall vs *committed* tier, capped); `apps/web` StakingFlow + /api/stakes + StakeBadge + marketplace "Staked" filter; migration `014_sla_breach_streaks.sql` (oracle-owned, NOT mirror).
+- **A4:** `apps/web` ClaimRefundButton on receipts (usage list + receipt detail) + /api/receipts/claim-refund; public `/insurance` dashboard; admin top-up; migration `016_insurance_pool.sql` (request_log refund cols + insurance_payouts/contributions mirrors + top_contributors view).
+- **A6:** new `packages/widget` (`@mcpxgg/widget`) zero-framework `<mcpx-call>` Web Component (Shadow DOM, CSS-var theming, Privy→bare-wallet fallback, reuses @mcpxgg/sdk); tsc ESM + esbuild IIFE/ESM CDN bundles; `apps/docs` embed page; landing + marketplace embeds; one-click third-party demo HTML. 24 tests.
+- **Indexer:** `handleUptoFinalized` + `finalizeUpto` storage (migration `015_upto_finalization.sql`, request_log quoted/actual/unused cols); `markRequestRefunded` now also writes migration-016 refund columns + idempotent `insurance_payouts` row (claim works end-to-end). 54 indexer tests.
 
 ### Next Steps
-1. **Sprint 7** (`docs/SPRINTS.md` line ~495, "Streaming + SLA Staking + Insurance + Widgets", June 29–July 12, 2 weeks). Read the S7 sub-task table before starting. Note S7 risk: x402 `upto` spec ambiguity — coordinate with x402 Foundation by S6 end.
-2. Sync local `main` in the primary worktree (`git pull --ff-only`).
-3. S6-T10/T13 stay blocked until Raj does the mainnet keystore (BLOCKED.md item 11). Don't retry — it's not code.
-4. The single highest-leverage unblock remains **BLOCKED.md item 1 (Sui keystore + testnet deploy)** and **item 2 is now DONE (GitHub repo exists)**. CI workflow will run on the next push — check it.
+1. **Push `claude/modest-swartz-dcdccc` and fast-forward `origin/main`** (remote is 2 sprints behind: S6 → S7). Check the GitHub CI workflow runs green on push.
+2. Sync local `main` in primary worktree (`git pull --ff-only`).
+3. **Sprint 8** (`docs/SPRINTS.md` ~line 586, "Migration + Audit Prep + Demo Day", July 13–19): web2→Sui migration script, OtterSec audit submission, docs.mcpx.gg site, landing/marketing refactor, loadtest, Demo Day prep. Read the S8 sub-task table first.
+4. S6-T10/T13 stay blocked (mainnet keystore, BLOCKED.md item 11). BLOCKED.md item 1 (Sui keystore + testnet deploy) remains the top unblock.
 
 ### Key Decisions
-- **Contracts as dependency root:** landed `contracts` agent foreground first, then 4 parallel implementation agents (indexer, servers, web, sdk/gateway) briefed with the finalized contract signatures + event field list — avoids cross-agent event-shape races.
-- **Migration numbering:** S6 SPRINTS text said `008_/009_` but those were already taken (users_sui/bundles); used `010–013`. SPRINTS task text corrected to real filenames.
-- **walrus `.js` fix = root cause, not config band-aid:** made walrus imports extensionless to match every other monorepo package (shared/chain) under `moduleResolution: Bundler` + Turbopack, rather than fighting webpack/Turbopack extensionAlias config.
-- **Supabase client env fallback:** browser client only truly runs client-side (Next inlines public env there); placeholder fallbacks just keep build-time static prerender from throwing — lets CI build with zero secrets.
-- **Merge via `git push origin HEAD:main`:** local `main` is checked out in the primary worktree so couldn't `checkout main` here; pushed HEAD directly (clean fast-forward).
-- **Quality score weighting locked:** availability dominates (0.5 uptime), correctness next (0.3), latency tiebreaker (0.2). Zero-call servers not attested. Deterministic UTC-anchored windows to avoid oracle drift.
+- **Contracts + packages/chain as dependency root:** did both foreground first (small, shared), then briefed 5 parallel agents with finalized Move/builder signatures — same proven S6 pattern, avoids cross-agent shape races.
+- **`settle_call_upto` = thin wrapper over `settle_inner`:** debits only `actual_atomic`; the x402 "refund delta" is *implicit* (never debited) — no escrow/refund coin path needed. Cleaner + correct.
+- **`claim_for_failed_call` is permissionless, gated by the soulbound receipt itself** (success==false && !refunded, sender==payer). The receipt *is* the proof — no oracle/cap. `refunded` flag makes it single-claim.
+- **Slash formula:** `shortfall = clamp((committedX100 − actualX100)/committedX100,0,1)`; `slash = round(remainingStake × shortfall)`, capped; only after ≥2 consecutive in-breach windows; zero-call windows = no-signal (streak unchanged).
+- **Migration 015 collision** (insurance vs upto, both agents): renamed insurance → `016`; both only ALTER request_log with disjoint columns so order-agnostic.
+- **`insurance_top_contributors` stays empty by design:** on-chain `InsuranceCollected` carries no contributor address, so named attribution isn't event-derivable today; page degrades gracefully (documented, not a TODO).
+- **`stakes`/`stake_slashes` are the migration-007 mirror** the existing indexer staking handler already writes; migration-011 `server_stakes` is unused scaffold — deliberately not used.
 
 ### Previous Session Notes
-- **S1 (2026-05-10):** 13 Move modules + atomic settlement + chain mirror schema + 65 Move tests + TS validation. (Pre-S6 history: S0 scaffold → S1 contracts → S2 facilitator+indexer → S3 chain gateway+server SDK → S4 Privy+chain+marketplace → S5 anchors #2/#3+CLI+bundles.)
+- **S6 (2026-05-17):** spending intents end-to-end, quality oracle, anchors #4/#5, /live, abuse detection (commit 7c003f8). **S1 (2026-05-10):** 13 Move modules + atomic settlement + chain mirror + 65 tests. Pre-S6: S0 scaffold → S1 contracts → S2 facilitator+indexer → S3 chain gateway+SDK → S4 Privy+chain+marketplace → S5 anchors #2/#3+CLI+bundles → S6 intents+oracle+anchors#4/5 → S7 streaming+staking+insurance+widget.
