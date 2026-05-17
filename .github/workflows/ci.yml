@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # --continue so a single failing package doesn't cancel its siblings
+      # and mask the true state of the monorepo.
+      - name: Typecheck
+        run: pnpm turbo run typecheck --continue
+
+      - name: Test
+        run: pnpm turbo run test --continue
+
+      - name: Build
+        run: pnpm turbo run build --continue
+
+  move:
+    name: sui move test
+    runs-on: ubuntu-latest
+    env:
+      # Pin the Sui CLI to the toolchain the contracts were written/tested
+      # against (local dev = 1.71.1). Bump deliberately.
+      SUI_VERSION: mainnet-v1.71.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Sui CLI
+        run: |
+          set -euo pipefail
+          url="https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          echo "Downloading $url"
+          curl -fsSL "$url" -o sui.tgz
+          mkdir -p "$HOME/.sui/extract" "$HOME/.sui/bin"
+          tar -xzf sui.tgz -C "$HOME/.sui/extract"
+          # The release tarball layout has varied across versions (flat vs.
+          # nested); locate the `sui` binary wherever it landed.
+          sui_bin="$(find "$HOME/.sui/extract" -type f -name sui | head -n1)"
+          test -n "$sui_bin"
+          install -m 0755 "$sui_bin" "$HOME/.sui/bin/sui"
+          echo "$HOME/.sui/bin" >> "$GITHUB_PATH"
+
+      - name: Sui version
+        run: sui --version
+
+      - name: Move tests
+        working-directory: contracts
+        run: sui move test
