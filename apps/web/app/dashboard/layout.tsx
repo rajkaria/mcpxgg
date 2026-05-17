@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { UserProvider } from "@/components/dashboard/user-context";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { LowBalanceBanner } from "@/components/LowBalanceBanner";
 import type { Database } from "@/lib/supabase/types";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
@@ -26,7 +27,10 @@ export default async function DashboardLayout({
       <div className="flex min-h-screen">
         <Sidebar />
         <main className="flex-1 md:ml-64">
-          <div className="mx-auto max-w-4xl p-6 pt-16 md:pt-6">{children}</div>
+          <div className="mx-auto max-w-4xl p-6 pt-16 md:pt-6">
+            <LowBalanceBanner />
+            {children}
+          </div>
         </main>
       </div>
     </UserProvider>

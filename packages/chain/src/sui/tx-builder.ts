@@ -201,6 +201,81 @@ export async function buildActivateBundleTx(args: {
   return { txBytesB64: Buffer.from(txBytes).toString('base64') };
 }
 
+/**
+ * S6-T05 — Spending Intents.
+ *
+ * Move entry points (contracts/sources/intent.move):
+ *   mcpx::intent::create(agent, daily_cap_atomic, per_call_cap_atomic,
+ *                        server_ids: vector<ID>, allowed_categories:
+ *                        vector<vector<u8>>, expires_at_ms, clock, ctx) -> ID
+ *     shares the SpendingIntent internally; the returned `ID` is discardable.
+ *   mcpx::intent::revoke(intent: &mut SpendingIntent, clock, ctx)
+ *
+ * The web builds these PTBs server-side and hands the BCS bytes to Privy's
+ * embedded wallet — identical flow to session recharge (S4-T06/T07). The
+ * server never holds the key and never writes the `intents` mirror (ADR-011).
+ */
+export async function buildCreateIntentTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  agentAddress: string;
+  dailyCapAtomic: bigint;
+  perCallCapAtomic: bigint;
+  /** Scoped server object ids. Empty = any server. */
+  serverObjectIds: string[];
+  /** Allowed category strings. Empty = any category. */
+  allowedCategories: string[];
+  expiresAtMs: bigint;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const enc = (s: string) => Array.from(new TextEncoder().encode(s));
+  const serverIds = tx.makeMoveVec({
+    type: '0x2::object::ID',
+    elements: args.serverObjectIds.map((id) => tx.pure.address(id)),
+  });
+  const categories = tx.makeMoveVec({
+    type: 'vector<u8>',
+    elements: args.allowedCategories.map((c) => tx.pure.vector('u8', enc(c))),
+  });
+  tx.moveCall({
+    target: `${args.cfg.packageId}::intent::create`,
+    arguments: [
+      tx.pure.address(args.agentAddress),
+      tx.pure.u64(args.dailyCapAtomic),
+      tx.pure.u64(args.perCallCapAtomic),
+      serverIds,
+      categories,
+      tx.pure.u64(args.expiresAtMs),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+export async function buildRevokeIntentTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  intentObjectId: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  tx.moveCall({
+    target: `${args.cfg.packageId}::intent::revoke`,
+    arguments: [
+      tx.object(args.intentObjectId), // shared &mut SpendingIntent
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
 /** A tool as it goes into `mcpx::registry::add_tool`. */
 export interface PublishToolInput {
   name: string;
@@ -258,6 +333,61 @@ export async function buildPublishServerTx(args: {
     ],
   });
   tx.transferObjects([cap], tx.pure.address(args.sender));
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/**
+ * S6-T18 — quality oracle attestation PTB.
+ *
+ * Move entry point (contracts/sources/quality.move):
+ *   mcpx::quality::attest(&OracleCap, server_id: ID, score_x100: u32,
+ *     uptime_x100: u32, p95_latency_ms: u32, error_rate_x100: u32,
+ *     sample_count: u64, window_start_ms: u64, window_end_ms: u64,
+ *     clock: &Clock, ctx) -> ID
+ *
+ * `attest` returns an `ID` (copy,drop) the PTB discards. The OracleCap is an
+ * owned object held by the oracle's signing address — only that key may
+ * attest. Built here so the oracle service never imports @mysten/sui.
+ */
+export interface AttestQualityArgs {
+  cfg: Pick<SuiTxConfig, 'packageId' | 'rpcUrl'>;
+  sender: string;
+  /** Owned OracleCap object id held by `sender`. */
+  oracleCapId: string;
+  serverObjectId: string;
+  /** Composite quality score ×100 (0..10000). */
+  scoreX100: number;
+  /** Uptime ×100 (0..10000). */
+  uptimeX100: number;
+  p95LatencyMs: number;
+  /** Error rate ×100 (0..10000). */
+  errorRateX100: number;
+  sampleCount: number;
+  windowStartMs: number;
+  windowEndMs: number;
+}
+
+export async function buildAttestQualityTx(args: AttestQualityArgs): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  tx.moveCall({
+    target: `${args.cfg.packageId}::quality::attest`,
+    arguments: [
+      tx.object(args.oracleCapId),
+      tx.pure.address(args.serverObjectId), // ID is BCS-identical to address
+      tx.pure.u32(args.scoreX100),
+      tx.pure.u32(args.uptimeX100),
+      tx.pure.u32(args.p95LatencyMs),
+      tx.pure.u32(args.errorRateX100),
+      tx.pure.u64(BigInt(args.sampleCount)),
+      tx.pure.u64(BigInt(args.windowStartMs)),
+      tx.pure.u64(BigInt(args.windowEndMs)),
+      tx.object('0x6'), // Clock
+    ],
+  });
   const txBytes = await tx.build({ client });
   return { txBytesB64: Buffer.from(txBytes).toString('base64') };
 }

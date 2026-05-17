@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { QualityBadge } from "@/components/QualityBadge";
 
 interface Server {
   id: string;
@@ -17,6 +18,8 @@ interface Server {
   icon_url: string | null;
   status: string;
   created_at: string;
+  quality_score_x100?: number | null;
+  featured?: boolean;
 }
 
 interface MarketplaceClientProps {
@@ -190,9 +193,22 @@ export function MarketplaceClient({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-base truncate" style={{ color: "var(--text)" }}>
-                      {server.name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base truncate" style={{ color: "var(--text)" }}>
+                        {server.name}
+                      </h3>
+                      {server.featured && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0"
+                          style={{
+                            background: "var(--primary-glow)",
+                            color: "var(--primary)",
+                          }}
+                        >
+                          Featured
+                        </span>
+                      )}
+                    </div>
                     <p
                       className="text-xs font-mono truncate"
                       style={{
@@ -226,6 +242,7 @@ export function MarketplaceClient({
                       </svg>
                       {server.total_users || 0}
                     </span>
+                    <QualityBadge scoreX100={server.quality_score_x100} />
                   </div>
                   {server.category && (
                     <span

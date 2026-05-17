@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { RevenueCalculator } from "@/components/RevenueCalculator";
 
 const steps = [
   {
@@ -183,6 +184,13 @@ export default function DevelopersPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Revenue calculator (S6-T24) */}
+      <section className="pb-24 px-6">
+        <div className="max-w-3xl mx-auto">
+          <RevenueCalculator />
         </div>
       </section>
 

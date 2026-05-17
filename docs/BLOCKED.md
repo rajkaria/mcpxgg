@@ -22,6 +22,12 @@
 | 7 | Fly.io services | S0-T06, S2-T10, S2-T21, S3-T09 | `fly launch` for `apps/gateway`, `apps/facilitator`, `apps/indexer`; set fly-secrets (gas-station key mlocked, RPC URLs, chain IDs). |
 | 8 | DNS | S0-T07, S2-T11, S3-T10 | At the `mcp.gg` registrar: `mcp.` → gateway Fly, `facilitator.` → facilitator Fly, `docs.` → Vercel, apex/`www` → web Vercel. |
 
+## 1b. Pre-existing build blocker (not Sprint-6-introduced)
+
+| # | Item | Sprint IDs | What you do |
+|---|---|---|---|
+| 8b | `packages/walrus` `.js` import specifiers | pre-existing | `packages/walrus/src/index.ts` re-exports with `./seal.js` / `./backend.js` / `./http.js` / `./in-memory.js` specifiers while `main`/`types` resolve to TS source with no build emit. Turbopack (`next build`) can't remap `.js`→`.ts`, so `apps/web/app/receipts/[id]/page.tsx` + `components/SealReceiptViewer.tsx` fail to bundle. Reproduces on a clean baseline with all Sprint-6 changes stashed — **not introduced by Sprint 6**. Fix: make walrus's relative imports extensionless (like `@mcpxgg/chain` / `@mcpxgg/shared`, which build fine) or add a real build emit + point `main` at `dist`. `pnpm --filter ./apps/web typecheck` is fully green including all Sprint-6 code; only the Turbopack bundle of the unrelated receipts route is blocked. |
+
 ## 2. Trust / signing gated
 
 | # | Item | Sprint IDs | What you do |
@@ -33,7 +39,7 @@
 
 | # | Item | Sprint IDs | What you do |
 |---|---|---|---|
-| 11 | Mainnet Move deploy | S5-T21..T25 | After testnet rehearsal (item 1): mainnet keystore + multisig AdminCap, `bash contracts/scripts/deploy-mainnet.sh`, lock IDs in `DEPLOY.md` + prod env, re-publish anchor servers, run the post-deploy smoke. Audit checklist is in `contracts/MAINNET-PREP.md` (added this sprint). |
+| 11 | Mainnet Move deploy | S5-T21..T25, S6-T10, S6-T13 | After testnet rehearsal (item 1): mainnet keystore + multisig AdminCap, `bash contracts/scripts/deploy-mainnet.sh`, lock IDs in `DEPLOY.md` + prod env, re-publish anchor servers, run the post-deploy smoke. Audit checklist is in `contracts/MAINNET-PREP.md` (added this sprint). The S6 anchor servers `walrus-store` (S6-T10) and `sui-identity` (S6-T13) are code-complete with deploy-ready `Dockerfile` + `fly.toml`; deploy is one `fly deploy` each once the mainnet keystore exists. |
 
 ## "Replace the live mcpx.gg with this repo" — cutover plan
 

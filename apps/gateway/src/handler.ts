@@ -19,6 +19,7 @@ import type { GatewayCache } from './cache/cache.js';
 import type { AuthContext, GatewayStore } from './store/store.js';
 import type { SessionSigner } from './settlement.js';
 import { settle } from './settlement.js';
+import { validateIntent } from './intent.js';
 import { preflight } from './preflight.js';
 import { executeTool } from './executor.js';
 import { archiveCall } from './walrus-archive.js';
@@ -51,6 +52,14 @@ export interface JsonRpcResponse {
   error?: { code: number; message: string; data?: unknown };
 }
 
+/** Per-request metadata lifted from HTTP headers (S6-T06). */
+export interface RequestMeta {
+  /** `X-Mcpx-Intent-Id` — settle this call against a spending intent. */
+  intentId?: string;
+  /** `X-Mcpx-Category` — checked against the intent's allowed categories. */
+  category?: string;
+}
+
 const PROTOCOL_VERSION = '2025-03-26';
 const FREE_TIER_TTL_SECONDS = 60 * 60 * 24 * 30;
 
@@ -64,6 +73,7 @@ export async function handleMcpRequest(
   req: JsonRpcRequest,
   auth: AuthContext,
   deps: GatewayDeps,
+  meta: RequestMeta = {},
 ): Promise<JsonRpcResponse> {
   const id = req.id ?? null;
   try {
@@ -80,7 +90,7 @@ export async function handleMcpRequest(
       case 'tools/list':
         return ok(id, { tools: await listTools(auth, deps) });
       case 'tools/call':
-        return await handleToolsCall(id, req.params ?? {}, auth, deps);
+        return await handleToolsCall(id, req.params ?? {}, auth, deps, meta);
       default:
         return err(id, -32601, `Method not found: ${req.method}`);
     }
@@ -121,6 +131,7 @@ async function handleToolsCall(
   params: Record<string, unknown>,
   auth: AuthContext,
   deps: GatewayDeps,
+  meta: RequestMeta,
 ): Promise<JsonRpcResponse> {
   const now = deps.now ?? Date.now;
   const fullName = params.name as string | undefined;
@@ -157,6 +168,41 @@ async function handleToolsCall(
     }
     throw e;
   }
+
+  // Spending-intent validation (S6-T06). Only when the request carries
+  // `X-Mcpx-Intent-Id`. No header → unchanged session-cap settlement.
+  const intentCategory = meta.category ?? '';
+  if (meta.intentId !== undefined) {
+    try {
+      await validateIntent(deps.store, {
+        intentObjectId: meta.intentId,
+        category: intentCategory,
+        callerAddress: auth.ownerAddress,
+        serverObjectId: server.serverObjectId,
+        chargeAtomic,
+        nowMs: now(),
+      });
+    } catch (e) {
+      if (e instanceof GatewayError) {
+        deps.logger.warn(
+          {
+            requestId,
+            userId: auth.userId,
+            tool: fullName,
+            intentId: meta.intentId,
+            code: e.code,
+          },
+          'gateway: intent rejected',
+        );
+        return ok(id, makeToolErrorContent(e.code, e.message));
+      }
+      throw e;
+    }
+  }
+  const intentSettle =
+    meta.intentId !== undefined
+      ? { intentId: meta.intentId, category: intentCategory }
+      : {};
 
   // Execute upstream.
   let exec;
@@ -209,6 +255,7 @@ async function handleToolsCall(
       chargeAtomic,
       success: !exec.isError,
       ...(blobId ? { receiptBlobId: blobId } : {}),
+      ...intentSettle,
       nowMs: now(),
     }).then((o) => {
       if (!o.settled) {
@@ -226,6 +273,7 @@ async function handleToolsCall(
       chargeAtomic,
       success: !exec.isError,
       ...(blobId ? { receiptBlobId: blobId } : {}),
+      ...intentSettle,
       nowMs: now(),
     });
     if (outcome.settled && outcome.result) {

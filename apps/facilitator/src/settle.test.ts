@@ -128,3 +128,51 @@ describe('settlePayment — failure paths', () => {
     assert.equal(r2.errorCode, 'rate_limited');
   });
 });
+
+describe('settlePayment — spending-intent path (S6-T06)', () => {
+  it('routes intentId + category from payload metadata to submitSettle', async () => {
+    const env = envForTests();
+    const backend = createInMemorySuiBackend({ sessions: { [SESSION_ID]: baseSession() } });
+    const gs = new GasStation({ ratePerMinute: 10, dailyBudgetMist: 1_000_000_000n });
+    const p = payload();
+    p.intentId = '0xintent';
+    p.details.metadata = { intentCategory: 'intelligence' };
+    const r = await settlePayment(input(p), backend, env, gs);
+    assert.equal(r.success, true);
+    assert.equal(backend.submittedParams[0]?.intentId, '0xintent');
+    assert.equal(backend.submittedParams[0]?.category, 'intelligence');
+  });
+
+  it('no intentId → no intent fields on submit (unchanged path)', async () => {
+    const env = envForTests();
+    const backend = createInMemorySuiBackend({ sessions: { [SESSION_ID]: baseSession() } });
+    const gs = new GasStation({ ratePerMinute: 10, dailyBudgetMist: 1_000_000_000n });
+    await settlePayment(input(), backend, env, gs);
+    assert.equal(backend.submittedParams[0]?.intentId, undefined);
+    assert.equal(backend.submittedParams[0]?.category, undefined);
+  });
+
+  it('rejects a non-0x intentId at the wire parser', async () => {
+    const env = envForTests();
+    const backend = createInMemorySuiBackend({ sessions: { [SESSION_ID]: baseSession() } });
+    const gs = new GasStation({ ratePerMinute: 10, dailyBudgetMist: 1_000_000_000n });
+    const wire = input();
+    (wire.payload as { intentId?: unknown }).intentId = 'not-hex';
+    const r = await settlePayment(wire, backend, env, gs);
+    assert.equal(r.success, false);
+    assert.equal(r.errorCode, 'verify_failed');
+    assert.equal(backend.submitted.length, 0);
+  });
+
+  it('intentId with no category defaults category to empty string', async () => {
+    const env = envForTests();
+    const backend = createInMemorySuiBackend({ sessions: { [SESSION_ID]: baseSession() } });
+    const gs = new GasStation({ ratePerMinute: 10, dailyBudgetMist: 1_000_000_000n });
+    const p = payload();
+    p.intentId = '0xintent';
+    const r = await settlePayment(input(p), backend, env, gs);
+    assert.equal(r.success, true);
+    assert.equal(backend.submittedParams[0]?.intentId, '0xintent');
+    assert.equal(backend.submittedParams[0]?.category, '');
+  });
+});

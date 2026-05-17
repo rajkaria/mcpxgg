@@ -41,6 +41,20 @@ export interface ResolvedTool {
   timeoutSeconds: number;
 }
 
+/** Indexer mirror of `mcpx::intent::SpendingIntent` (S6-T06). Read-only. */
+export interface ResolvedIntent {
+  intentObjectId: string;
+  agentAddress: string;
+  dailyCapAtomic: bigint;
+  perCallCapAtomic: bigint;
+  serverObjectIds: string[];
+  allowedCategories: string[];
+  todaySpentAtomic: bigint;
+  todayEpochDay: number | null;
+  expiresAtMs: number;
+  revoked: boolean;
+}
+
 export interface GatewayStore {
   getAuthByApiKey(apiKey: string): Promise<AuthContext | null>;
   resolveServer(namespace: string): Promise<ResolvedServer | null>;
@@ -49,4 +63,6 @@ export interface GatewayStore {
   listTools(serverObjectId: string): Promise<ResolvedTool[]>;
   /** Active servers a key may see in tools/list. */
   listScopedServers(auth: AuthContext): Promise<ResolvedServer[]>;
+  /** Read-only intent mirror lookup (S6-T06). null if unknown. */
+  resolveIntent(intentObjectId: string): Promise<ResolvedIntent | null>;
 }

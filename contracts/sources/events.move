@@ -175,6 +175,7 @@ public struct IntentCreated has copy, drop {
     user: address,
     agent: address,
     daily_cap_atomic: u64,
+    per_call_cap_atomic: u64,
     expires_at_ms: u64,
 }
 
@@ -442,6 +443,7 @@ public(package) fun emit_intent_created(
     user: address,
     agent: address,
     daily_cap_atomic: u64,
+    per_call_cap_atomic: u64,
     expires_at_ms: u64,
 ) {
     event::emit(IntentCreated {
@@ -449,6 +451,7 @@ public(package) fun emit_intent_created(
         user,
         agent,
         daily_cap_atomic,
+        per_call_cap_atomic,
         expires_at_ms,
     });
 }

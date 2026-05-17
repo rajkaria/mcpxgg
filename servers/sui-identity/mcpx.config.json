@@ -1,0 +1,67 @@
+{
+  "namespace": "sui-identity",
+  "name": "Sui Identity",
+  "description": "zkLogin-aware identity resolver. SuiNS name ↔ address resolution, zkLogin proof verification, and CallReceipt-derived address reputation.",
+  "category": "identity",
+  "tags": ["identity", "sui", "suins", "zklogin", "reputation"],
+  "triggerPhrases": ["resolve suins name", "who owns this address", "verify zklogin", "address reputation"],
+  "endpointUrl": "https://sui-identity.mcpx.gg",
+  "tools": [
+    {
+      "name": "resolve_address",
+      "description": "Resolve a SuiNS name (e.g. alice.sui) to its owner address.",
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 5,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "resolve_name",
+      "description": "Resolve a Sui address to its primary SuiNS name, if any.",
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 5,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" }
+        },
+        "required": ["address"]
+      }
+    },
+    {
+      "name": "verify_zklogin",
+      "description": "Verify a zkLogin proof envelope. Returns { valid, issuer, subHash }; the raw OIDC subject is never returned.",
+      "priceAtomic": "5000",
+      "freeTierCallsPerUser": 1,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "proof": { "type": "object" }
+        },
+        "required": ["proof"]
+      }
+    },
+    {
+      "name": "address_reputation",
+      "description": "Reputation for a Sui address derived from its on-chain CallReceipt count (read from the indexer mirror).",
+      "priceAtomic": "2000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": { "type": "string" }
+        },
+        "required": ["address"]
+      }
+    }
+  ]
+}

@@ -342,6 +342,33 @@ export interface Database {
           }
         ];
       };
+      featured_servers: {
+        Row: {
+          id: number;
+          server_object_id: string;
+          week_start: string;
+          position: number;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          server_object_id: string;
+          week_start: string;
+          position?: number;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          server_object_id?: string;
+          week_start?: string;
+          position?: number;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       chain_balances: {
@@ -392,6 +419,7 @@ export interface Database {
           tx_digest: string | null;
           on_chain_version: number | null;
           tool_count: number | null;
+          latest_quality_x100: number | null;
           created_at: string | null;
         };
         Relationships: [];
@@ -425,10 +453,46 @@ export interface Database {
       live_feed_24h: {
         Row: {
           tx_digest: string | null;
+          server_object_id: string | null;
+          server_name: string | null;
+          payer_address: string | null;
           namespace: string | null;
           tool_name: string | null;
           amount_atomic: number | string | null;
           created_at: string | null;
+        };
+        Relationships: [];
+      };
+      intents: {
+        Row: {
+          intent_object_id: string;
+          chain_id: string;
+          user_address: string;
+          agent_address: string;
+          daily_cap_atomic: number | string;
+          per_call_cap_atomic: number | string | null;
+          allowed_categories: string[] | null;
+          server_ids: string[] | null;
+          expires_at_ms: number | string;
+          today_spent: number | string | null;
+          lifetime_spent: number | string | null;
+          status: string;
+          tx_digest: string | null;
+          created_at: string | null;
+        };
+        Relationships: [];
+      };
+      quality_attestations: {
+        Row: {
+          attestation_object_id: string;
+          server_object_id: string;
+          score_x100: number;
+          uptime_x100: number;
+          p95_latency_ms: number;
+          error_rate_x100: number;
+          attested_at_ms: number | string | null;
+          observed_at: string | null;
+          tx_digest: string | null;
         };
         Relationships: [];
       };

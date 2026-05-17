@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listMarketplaceServers } from "@/lib/chain/reads";
+import { listMarketplaceServers, listCurrentFeatured } from "@/lib/chain/reads";
 import { MarketplaceClient } from "./marketplace-client";
 
 const categories = [
@@ -28,6 +28,16 @@ export default async function MarketplacePage({
 
   // S4-T12: read the indexer mirror (marketplace_servers view), not chain RPC.
   const all = await listMarketplaceServers();
+  // S6-T25: app-owned featured rotation (read-only here).
+  let featuredIds: string[] = [];
+  try {
+    const feat = await listCurrentFeatured();
+    featuredIds = feat
+      .sort((a, b) => a.position - b.position)
+      .map((f) => f.serverObjectId);
+  } catch {
+    featuredIds = [];
+  }
   const q = params.q?.toLowerCase();
   const filtered = all.filter((s) => {
     if (
@@ -47,8 +57,19 @@ export default async function MarketplacePage({
     return true;
   });
 
+  const featuredRank = new Map(featuredIds.map((id, i) => [id, i]));
+  // Featured-first ordering when no explicit search/sort is applied.
+  const ordered =
+    featuredIds.length && !q && !params.sort
+      ? [...filtered].sort((a, b) => {
+          const ra = featuredRank.get(a.objectId) ?? Infinity;
+          const rb = featuredRank.get(b.objectId) ?? Infinity;
+          return ra - rb;
+        })
+      : filtered;
+
   // Map view rows into the shape MarketplaceClient renders.
-  const servers = filtered.map((s) => ({
+  const servers = ordered.map((s) => ({
     id: s.objectId,
     name: s.name,
     namespace: s.namespace,
@@ -59,6 +80,8 @@ export default async function MarketplacePage({
     icon_url: null,
     status: "active",
     created_at: "",
+    quality_score_x100: s.qualityScoreX100,
+    featured: featuredRank.has(s.objectId),
   }));
 
   return (

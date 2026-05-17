@@ -449,38 +449,54 @@ full `pnpm turbo run typecheck test` green.
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S6-T01 | `mcpx::intent::SpendingIntent` Move: agent_address, allowed_categories, daily_cap, per_call_cap, expires_at | contracts | M | ☐ |
-| S6-T02 | Intent settlement integration: `settle_call` accepts an optional intent_id; checks agent_address matches caller, decrements daily counter | contracts | M | ☐ |
-| S6-T03 | Intent revocation tx + IntentRevoked event | contracts | S | ☐ |
-| S6-T04 | Indexer: IntentCreated, IntentUsed, IntentRevoked → `intents` table | apps/indexer | M | ☐ |
-| S6-T05 | `<IntentManager />` UI: list active intents, create new (pick agent address, category, daily cap, expiry), revoke | apps/web | L | ☐ |
-| S6-T06 | Gateway integration: if request includes `X-Mcpx-Intent-Id`, validate intent before settlement | apps/gateway | M | ☐ |
-| S6-T07 | `@mcpxgg/sdk` extension: `client.callTool(..., { intentId })` for agents | packages/sdk-client | S | ☐ |
-| S6-T08 | Docs: "Building an autonomous agent that uses MCPX" guide referencing intents | apps/docs | M | ☐ |
-| S6-T09 | `servers/walrus-store/`: tools `upload`, `retrieve`, `metadata`, `list` per spec §10.4 | servers | L | ☐ |
-| S6-T10 | walrus-store: deploy + publish to mainnet | hosting | M | ☐ |
-| S6-T11 | `servers/sui-identity/`: tools `resolve_address`, `resolve_name`, `verify_zklogin`, `address_reputation` per spec §10.5 | servers | L | ☐ |
-| S6-T12 | sui-identity: SuiNS integration; zkLogin proof verifier; reputation stub from CallReceipt count | servers | L | ☐ |
-| S6-T13 | sui-identity: deploy + publish to mainnet | hosting | M | ☐ |
-| S6-T14 | `/live` page Bloomberg-style layout: live feed + cumulative metrics + top servers + active users | apps/web | L | ☐ |
-| S6-T15 | `/live` data via SSE/WebSocket from indexer Redis pub/sub | apps/web + apps/indexer | M | ☐ |
-| S6-T16 | `/live` cumulative metric polling for 24h windows from materialized views | apps/web | M | ☐ |
-| S6-T17 | `/live` social embed-friendly OG image (every page-load updates image with current numbers) | apps/web | M | ☐ |
-| S6-T18 | Quality oracle service: `apps/quality-oracle/` (or as part of indexer) — every 6h, computes uptime + latency + error_rate per server, attests on-chain | apps/indexer + contracts | L | ☐ |
-| S6-T19 | Quality score badge on marketplace + server detail | apps/web | M | ☐ |
-| S6-T20 | Migration `008_quality_attestations.sql`: mirror of QualityAttestation events | supabase | S | ☐ |
-| S6-T21 | Migration `009_intents_bundles_staking.sql`: mirror of intents, bundles, stakes (stakes used in S7) | supabase | S | ☐ |
-| S6-T22 | Try-before-you-enable: "Demo call" button on each server detail page; uses 1 free call from treasury subsidy | apps/web + apps/facilitator | M | ☐ |
-| S6-T23 | Credit alert: push email + in-app when session balance < $0.50 | apps/web | M | ☐ |
-| S6-T24 | Revenue calculator widget on `/developers` landing | apps/web | M | ☐ |
-| S6-T25 | Featured server rotation admin UI (curate weekly featured) | apps/web | S | ☐ |
-| S6-T26 | Abuse detection heuristics: flag accounts with >3 sigma anomalous patterns; admin review queue | apps/indexer + apps/web | M | ☐ |
+| S6-T01 | `mcpx::intent::SpendingIntent` Move: agent_address, allowed_categories, daily_cap, per_call_cap, expires_at | contracts | M | Done |
+| S6-T02 | Intent settlement integration: `settle_call_with_intent` checks agent==session payer, decrements intent counters post-receipt | contracts | M | Done |
+| S6-T03 | Intent revocation tx + IntentRevoked event | contracts | S | Done |
+| S6-T04 | Indexer: IntentCreated, IntentUsed, IntentRevoked → `intents` table | apps/indexer | M | Done |
+| S6-T05 | `<IntentManager />` UI: list active intents, create new (pick agent address, category, daily cap, expiry), revoke | apps/web | L | Done |
+| S6-T06 | Gateway integration: if request includes `X-Mcpx-Intent-Id`, validate intent before settlement | apps/gateway | M | Done |
+| S6-T07 | `@mcpxgg/sdk` extension: `client.callTool(..., { intentId })` for agents | packages/sdk-client | S | Done |
+| S6-T08 | Docs: "Building an autonomous agent that uses MCPX" guide referencing intents | apps/docs | M | Done |
+| S6-T09 | `servers/walrus-store/`: tools `upload`, `retrieve`, `metadata`, `list` per spec §10.4 | servers | L | Done |
+| S6-T10 | walrus-store: deploy + publish to mainnet | hosting | M | Blocked (mainnet keystore — see docs/BLOCKED.md item 11) |
+| S6-T11 | `servers/sui-identity/`: tools `resolve_address`, `resolve_name`, `verify_zklogin`, `address_reputation` per spec §10.5 | servers | L | Done |
+| S6-T12 | sui-identity: SuiNS integration; zkLogin proof verifier; reputation stub from CallReceipt count | servers | L | Done |
+| S6-T13 | sui-identity: deploy + publish to mainnet | hosting | M | Blocked (mainnet keystore — see docs/BLOCKED.md item 11) |
+| S6-T14 | `/live` page Bloomberg-style layout: live feed + cumulative metrics + top servers + active users | apps/web | L | Done |
+| S6-T15 | `/live` data via SSE/WebSocket from indexer Redis pub/sub | apps/web + apps/indexer | M | Done |
+| S6-T16 | `/live` cumulative metric polling for 24h windows from materialized views | apps/web | M | Done |
+| S6-T17 | `/live` social embed-friendly OG image (every page-load updates image with current numbers) | apps/web | M | Done |
+| S6-T18 | Quality oracle service: `apps/quality-oracle/` (or as part of indexer) — every 6h, computes uptime + latency + error_rate per server, attests on-chain | apps/indexer + contracts | L | Done |
+| S6-T19 | Quality score badge on marketplace + server detail | apps/web | M | Done |
+| S6-T20 | Migration `010_quality_attestations.sql`: mirror of QualityAttestation events | supabase | S | Done |
+| S6-T21 | Migration `011_intents_staking.sql`: intents per-call/category cols + server_stakes + abuse_flags (bundles already in 009) | supabase | S | Done |
+| S6-T22 | Try-before-you-enable: "Demo call" button on each server detail page; uses 1 free call from treasury subsidy | apps/web + apps/facilitator | M | Done |
+| S6-T23 | Credit alert: push email + in-app when session balance < $0.50 | apps/web | M | Done |
+| S6-T24 | Revenue calculator widget on `/developers` landing | apps/web | M | Done |
+| S6-T25 | Featured server rotation admin UI (curate weekly featured) | apps/web | S | Done |
+| S6-T26 | Abuse detection heuristics: flag accounts with >3 sigma anomalous patterns; admin review queue | apps/indexer + apps/web | M | Done |
 
 **Definition of Done.**
 - All 5 anchor servers live + indexed + listed in marketplace
 - /live page updates in real-time with at least one platform metric every 30s
 - Spending Intents demoable: a script "agent" running locally signs intent → uses it across multiple calls → user revokes → next call fails
 - Quality oracle has produced attestations for all 5 anchor servers
+
+**Sprint 6 status (2026-05-17).** All 24 code-side tasks ✓. Contracts: intent
+expanded (per_call_cap + allowed_categories), `settle_call_with_intent` via
+shared `settle_inner`, 77/77 Move tests. Indexer: per-call-cap mirror, abuse
+detection (3σ), migrations 010/011. New `apps/quality-oracle/` (6h UTC windows,
+score = 0.5·uptime + 0.3·(1−err) + 0.2·latency). New `servers/walrus-store/`
+(13 tests) + `servers/sui-identity/` (17 tests). Web: IntentManager, `/live`
+(SSE + OG image), quality badge, demo-call, low-balance alert, revenue
+calculator, featured-rotation admin (migration 012, app-owned). SDK
+`callTool(.., { intentId })`; gateway intent validation (8 error codes) →
+facilitator `settle_call_with_intent`; migration 013 gateway read view; docs
+agent guide. Fixed a pre-existing `@mcpxgg/walrus` `.js`-specifier bug + a
+Supabase prerender crash that were blocking `next build`. Verify: turbo
+typecheck ✓, turbo test 24/24 ✓, Move 77/77 ✓, web build ✓. Only **S6-T10 /
+S6-T13** remain (mainnet deploy of the 2 new anchor servers) — blocked on the
+mainnet keystore, see `docs/BLOCKED.md` item 11.
 
 **Dependencies.** Sprint 5 (mainnet).
 

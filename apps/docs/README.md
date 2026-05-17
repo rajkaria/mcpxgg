@@ -22,3 +22,8 @@ markdown under `content/`:
   full `mcpx.config.json` schema reference (S5-T13): every field, the
   `priceAtomic` USDsui 6-decimal convention, `freeTierCallsPerUser`, and an
   annotated example.
+- [`content/building-an-autonomous-agent.md`](./content/building-an-autonomous-agent.md) —
+  "Building an autonomous agent that uses MCPX" (S6-T08): create a
+  `SpendingIntent`, drive paid calls with `@mcpxgg/sdk`
+  `client.callTool(..., { intentId })`, observe `IntentUsed`, and handle
+  revocation.

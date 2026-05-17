@@ -3,6 +3,7 @@ module mcpx::settlement_tests;
 
 use mcpx::admin;
 use mcpx::insurance;
+use mcpx::intent;
 use mcpx::registry::{Self, NamespaceRegistry, Server, ServerOwnerCap};
 use mcpx::session;
 use mcpx::settlement::{Self, CallReceipt};
@@ -15,6 +16,7 @@ use sui::test_scenario as ts;
 
 const DEV: address = @0xDEFA;
 const USER: address = @0xCAFE;
+const AGENT: address = @0xA9E7;
 
 fun publish_test_server(
     sc: &mut ts::Scenario,
@@ -357,6 +359,159 @@ fun settle_with_custom_take_rate_distributes_correctly() {
         settlement::destroy_receipt_for_testing(r);
     };
 
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+// ─── Intent path (S6-T02) ───────────────────────────────────────────────────
+
+#[test]
+fun settle_with_intent_mints_receipt_and_decrements_intent() {
+    // The agent funds + owns the session; the intent delegates AGENT's budget.
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+    let server_id = object::id(&server);
+
+    // USER creates an intent delegating to AGENT, scoped to this server +
+    // category, with per-call + daily caps.
+    sc.next_tx(USER);
+    intent::create(
+        AGENT,
+        50_000,
+        20_000,
+        vector[server_id],
+        vector[b"analytics"],
+        0,
+        &clk,
+        sc.ctx(),
+    );
+
+    // AGENT owns the funded session (gateway opens it as the delegated agent).
+    sc.next_tx(AGENT);
+    let mut session = session::new_for_testing<SUI>(
+        AGENT,
+        balance::create_for_testing<SUI>(50_000),
+        0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(AGENT);
+    let mut intent_obj = sc.take_shared<intent::SpendingIntent>();
+    let receipt_id = settlement::settle_call_with_intent<SUI>(
+        &config,
+        &mut session,
+        &server,
+        &mut vault_obj,
+        &mut treasury_obj,
+        &mut insurance_obj,
+        &mut intent_obj,
+        10_000,
+        b"query",
+        b"analytics",
+        b"log-blob-1",
+        true,
+        &clk,
+        sc.ctx(),
+    );
+
+    assert!(treasury::balance_value(&treasury_obj) == 200, 0);
+    assert!(insurance::balance_value(&insurance_obj) == 50, 1);
+    assert!(vault::accrued_balance(&vault_obj) == 9_750, 2);
+    assert!(session::balance_value(&session) == 40_000, 3);
+    assert!(intent::today_spent(&intent_obj) == 10_000, 4);
+    assert!(intent::lifetime_spent(&intent_obj) == 10_000, 5);
+
+    sc.next_tx(AGENT);
+    {
+        let r = sc.take_from_address<CallReceipt>(AGENT);
+        assert!(object::id(&r) == receipt_id, 6);
+        assert!(settlement::receipt_payer(&r) == AGENT, 7);
+        settlement::destroy_receipt_for_testing(r);
+    };
+
+    ts::return_shared(intent_obj);
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::settlement::E_INTENT_AGENT_MISMATCH)]
+fun settle_with_intent_agent_payer_mismatch_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+
+    sc.next_tx(USER);
+    intent::create(AGENT, 50_000, 0, vector[], vector[], 0, &clk, sc.ctx());
+
+    // Session owned by USER, but intent delegates AGENT → mismatch.
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER,
+        balance::create_for_testing<SUI>(50_000),
+        0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(USER);
+    let mut intent_obj = sc.take_shared<intent::SpendingIntent>();
+    settlement::settle_call_with_intent<SUI>(
+        &config,
+        &mut session,
+        &server,
+        &mut vault_obj,
+        &mut treasury_obj,
+        &mut insurance_obj,
+        &mut intent_obj,
+        10_000,
+        b"query",
+        b"",
+        b"l",
+        true,
+        &clk,
+        sc.ctx(),
+    );
+
+    ts::return_shared(intent_obj);
     ts::return_shared(server);
     clock::destroy_for_testing(clk);
     admin::destroy_admin_cap_for_testing(admin_cap);

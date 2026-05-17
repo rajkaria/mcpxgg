@@ -1,0 +1,30 @@
+{
+  "name": "@mcpxgg/quality-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Every 6h: compute per-server quality (uptime/latency/error-rate) from the indexed request_log and attest it on-chain via mcpx::quality::attest.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "run-once": "tsx src/index.ts run-once",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'quality-oracle: lint placeholder'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@mcpxgg/chain": "workspace:*",
+    "@mcpxgg/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.99.2",
+    "hono": "^4.6.0",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

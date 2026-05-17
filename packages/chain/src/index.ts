@@ -19,12 +19,17 @@ export {
   buildAddToolsTx,
   buildCreateBundleTx,
   buildActivateBundleTx,
+  buildCreateIntentTx,
+  buildRevokeIntentTx,
+  buildAttestQualityTx,
+  type AttestQualityArgs,
   type SuiTxConfig,
   type BuiltTx,
   type PublishToolInput,
 } from './sui/tx-builder';
 export {
   signAndExecuteBase64Tx,
+  addressFromPrivateKey,
   type SignAndExecuteParams,
   type SignAndExecuteResult,
   type CreatedObject,

@@ -128,22 +128,47 @@ export async function createRealSuiBackend(env: FacilitatorEnv): Promise<SuiBack
     async submitSettle(params): Promise<SettleSubmitResult> {
       const tx = new Transaction();
       tx.setSender(gasStationKeypair.toSuiAddress());
-      tx.moveCall({
-        target: `${env.mcpxPackageId}::settlement::settle_call`,
-        typeArguments: [env.usdsuiTypeTag],
-        arguments: [
-          tx.object(params.sessionObjectId),
-          tx.object(params.serverObjectId),
-          tx.object(env.platformConfigId),
-          tx.object(env.treasuryId),
-          tx.object(env.insuranceId),
-          tx.pure.string(params.toolName),
-          tx.pure.u64(params.amountAtomic),
-          tx.pure.vector('u8', new TextEncoder().encode(params.logBlobId)),
-          tx.pure.bool(params.success),
-          tx.object('0x6'), // Clock
-        ],
-      });
+      const enc = (s: string) =>
+        Array.from(new TextEncoder().encode(s));
+      if (params.intentId !== undefined) {
+        // Intent-aware path (S6-T06). Same money movement as settle_call plus
+        // post-receipt intent policy/counter enforcement on chain.
+        tx.moveCall({
+          target: `${env.mcpxPackageId}::settlement::settle_call_with_intent`,
+          typeArguments: [env.usdsuiTypeTag],
+          arguments: [
+            tx.object(params.sessionObjectId),
+            tx.object(params.serverObjectId),
+            tx.object(env.platformConfigId),
+            tx.object(env.treasuryId),
+            tx.object(env.insuranceId),
+            tx.object(params.intentId),
+            tx.pure.string(params.toolName),
+            tx.pure.vector('u8', enc(params.category ?? '')),
+            tx.pure.u64(params.amountAtomic),
+            tx.pure.vector('u8', enc(params.logBlobId)),
+            tx.pure.bool(params.success),
+            tx.object('0x6'), // Clock
+          ],
+        });
+      } else {
+        tx.moveCall({
+          target: `${env.mcpxPackageId}::settlement::settle_call`,
+          typeArguments: [env.usdsuiTypeTag],
+          arguments: [
+            tx.object(params.sessionObjectId),
+            tx.object(params.serverObjectId),
+            tx.object(env.platformConfigId),
+            tx.object(env.treasuryId),
+            tx.object(env.insuranceId),
+            tx.pure.string(params.toolName),
+            tx.pure.u64(params.amountAtomic),
+            tx.pure.vector('u8', enc(params.logBlobId)),
+            tx.pure.bool(params.success),
+            tx.object('0x6'), // Clock
+          ],
+        });
+      }
       try {
         const result = await client.signAndExecuteTransaction({
           transaction: tx,

@@ -34,6 +34,9 @@ export interface InMemorySuiBackend extends SuiBackend {
   tickMs(n: number): void;
   /** All settlements processed by this backend, in order. */
   submitted: SettleSubmitResult[];
+  /** Params of every submitSettle, in order — lets tests assert the intent
+   *  path was taken (intentId/category present) without a real chain. */
+  submittedParams: SettleSubmitParams[];
 }
 
 export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InMemorySuiBackend {
@@ -48,6 +51,7 @@ export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InM
   };
   let nowMs = opts.initialNowMs ?? 1_700_000_000_000;
   const submitted: SettleSubmitResult[] = [];
+  const submittedParams: SettleSubmitParams[] = [];
 
   const verifyImpl =
     opts.verifyImpl ??
@@ -57,6 +61,7 @@ export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InM
 
   const backend: InMemorySuiBackend = {
     submitted,
+    submittedParams,
 
     async getSession(id): Promise<SessionView | null> {
       return sessions.get(id) ?? null;
@@ -71,6 +76,7 @@ export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InM
     },
 
     async submitSettle(params: SettleSubmitParams): Promise<SettleSubmitResult> {
+      submittedParams.push(params);
       if (opts.failSubmitWith) throw opts.failSubmitWith;
       const session = sessions.get(params.sessionObjectId);
       if (!session) {

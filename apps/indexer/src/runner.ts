@@ -18,6 +18,7 @@ import type { EventSource } from './event-source/source.js';
 import type { Cursor } from './types.js';
 import { dispatch } from './handlers/dispatch.js';
 import type { Logger } from './logger.js';
+import { priorClosedWindow, runAbuseScan } from './abuse.js';
 
 export interface RunnerOptions {
   storage: Storage;
@@ -76,15 +77,45 @@ export async function tick(
   return { processed: page.events.length, hasMore: page.hasNextPage };
 }
 
+/**
+ * S6-T26 — periodic abuse scan. Runs on the indexer's existing poll cadence
+ * (no extra timer) but fires the heuristic at most once per closed 6h
+ * UTC-anchored window. `nowMs` is injectable so this is unit-testable with
+ * no clock/db/network. Returns the window scanned, or null if the current
+ * window was already scanned.
+ */
+export async function maybeRunAbuseScan(
+  storage: Storage,
+  lastScannedBoundaryMs: number,
+  nowMs: number,
+  logger: Logger,
+): Promise<{ scannedBoundaryMs: number } | null> {
+  const { startMs, endMs } = priorClosedWindow(nowMs);
+  if (endMs <= lastScannedBoundaryMs) return null;
+  try {
+    const res = await runAbuseScan(storage, startMs, endMs);
+    logger.info(
+      { window: [startMs, endMs], analyzed: res.accountsAnalyzed, flags: res.flagsWritten },
+      'indexer: abuse scan complete',
+    );
+  } catch (e) {
+    logger.error({ err: String(e) }, 'indexer: abuse scan failed (non-fatal)');
+  }
+  return { scannedBoundaryMs: endMs };
+}
+
 export async function run(opts: RunnerOptions): Promise<void> {
-  const { logger, signal, pollIntervalMs } = opts;
+  const { logger, signal, pollIntervalMs, storage } = opts;
   logger.info({ pageSize: opts.pageSize, pollIntervalMs }, 'indexer: starting');
+  let lastAbuseBoundaryMs = 0;
   while (signal?.aborted !== true) {
     try {
       const result = await tick(opts);
       if (result.processed > 0) {
         logger.info({ processed: result.processed, hasMore: result.hasMore }, 'indexer: drained');
       }
+      const scan = await maybeRunAbuseScan(storage, lastAbuseBoundaryMs, Date.now(), logger);
+      if (scan) lastAbuseBoundaryMs = scan.scannedBoundaryMs;
       if (!result.hasMore) {
         await sleep(pollIntervalMs, signal);
       }

@@ -33,6 +33,13 @@ export interface SettleArgs {
   chargeAtomic: bigint;
   success: boolean;
   receiptBlobId?: string;
+  /**
+   * Spending-intent object id (S6-T06). When present the facilitator routes
+   * to `settle_call_with_intent`; absent → `settle_call` (unchanged).
+   */
+  intentId?: string;
+  /** Tool category, passed through for the intent's category check. */
+  category?: string;
   nowMs: number;
 }
 
@@ -54,7 +61,11 @@ export function buildPayment(
     amountAtomic: a.chargeAtomic,
     tokenType: env.usdsuiTypeTag,
     validUntilMs: a.nowMs + QUOTE_TTL_MS,
-    metadata: { gateway: true, userId: a.auth.userId },
+    metadata: {
+      gateway: true,
+      userId: a.auth.userId,
+      ...(a.intentId !== undefined ? { intentCategory: a.category ?? '' } : {}),
+    },
   };
   // Canonical message the signer commits to. The facilitator recomputes the
   // same shape in /verify; field order is fixed here.
@@ -82,6 +93,7 @@ export async function settle(
     signature,
     payerAddress: a.auth.ownerAddress,
     sessionObjectId: a.auth.sessionObjectId,
+    ...(a.intentId !== undefined ? { intentId: a.intentId } : {}),
     details,
   };
 

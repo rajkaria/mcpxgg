@@ -24,6 +24,7 @@ module mcpx::settlement;
 use mcpx::admin::{Self, PlatformConfig};
 use mcpx::events;
 use mcpx::insurance::{Self, InsurancePool};
+use mcpx::intent::{Self, SpendingIntent};
 use mcpx::registry::{Self, Server};
 use mcpx::session::{Self, Session};
 use mcpx::treasury::{Self, PlatformTreasury};
@@ -37,6 +38,7 @@ const E_SERVER_INACTIVE: u64 = 1;
 const E_TOOL_NOT_FOUND: u64 = 2;
 const E_VAULT_OWNER_MISMATCH: u64 = 3;
 const E_AMOUNT_OVERFLOW: u64 = 4;
+const E_INTENT_AGENT_MISMATCH: u64 = 5;
 
 // ─── Receipt ────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,77 @@ public struct CallReceipt has key {
 /// where required; the `Server` is read-only (we only check active + tool
 /// existence, no mutation).
 public fun settle_call<T>(
+    config: &PlatformConfig,
+    session: &mut Session<T>,
+    server: &Server,
+    vault: &mut DeveloperVault<T>,
+    treasury: &mut PlatformTreasury<T>,
+    insurance: &mut InsurancePool<T>,
+    amount_atomic: u64,
+    tool_name_bytes: vector<u8>,
+    log_blob_id: vector<u8>,
+    success: bool,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): ID {
+    settle_inner(
+        config,
+        session,
+        server,
+        vault,
+        treasury,
+        insurance,
+        amount_atomic,
+        tool_name_bytes,
+        log_blob_id,
+        success,
+        clock,
+        ctx,
+    )
+}
+
+/// Intent-aware settlement. The agent named in the intent must be the session
+/// payer (the gateway opens the session as the delegated agent). Settlement is
+/// identical to `settle_call`; afterward we record the spend against the intent
+/// so `IntentUsed` references the real, just-minted receipt id and the intent's
+/// per-call / daily / scope / category policy is enforced.
+public fun settle_call_with_intent<T>(
+    config: &PlatformConfig,
+    session: &mut Session<T>,
+    server: &Server,
+    vault: &mut DeveloperVault<T>,
+    treasury: &mut PlatformTreasury<T>,
+    insurance: &mut InsurancePool<T>,
+    intent: &mut SpendingIntent,
+    amount_atomic: u64,
+    tool_name_bytes: vector<u8>,
+    category_bytes: vector<u8>,
+    log_blob_id: vector<u8>,
+    success: bool,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): ID {
+    assert!(intent::agent(intent) == session::owner(session), E_INTENT_AGENT_MISMATCH);
+    let server_id = object::id(server);
+    let receipt_id = settle_inner(
+        config,
+        session,
+        server,
+        vault,
+        treasury,
+        insurance,
+        amount_atomic,
+        tool_name_bytes,
+        log_blob_id,
+        success,
+        clock,
+        ctx,
+    );
+    intent::record_spend(intent, server_id, amount_atomic, receipt_id, category_bytes, clock);
+    receipt_id
+}
+
+fun settle_inner<T>(
     config: &PlatformConfig,
     session: &mut Session<T>,
     server: &Server,

@@ -7,6 +7,7 @@
  *   session   → public.chain_balances(user_id, active) → Session mirror
  *   server    → public.mcp_servers(namespace, status='active')
  *   tool      → public.mcp_tools(server_id, tool_name)
+ *   intent    → public.intents_gateway(intent_object_id) → SpendingIntent mirror
  *
  * BIGINT columns arrive as strings (supabase-js would lose precision past
  * 2^53 as numbers); we BigInt() them at the boundary.
@@ -15,6 +16,7 @@
 import type {
   AuthContext,
   GatewayStore,
+  ResolvedIntent,
   ResolvedServer,
   ResolvedTool,
 } from './store.js';
@@ -163,6 +165,38 @@ export async function createSupabaseStore(
           endpointUrl: String(d.endpoint_url),
           active: true,
         }));
+    },
+
+    async resolveIntent(
+      intentObjectId: string,
+    ): Promise<ResolvedIntent | null> {
+      const { data } = (await sb
+        .from('intents_gateway')
+        .select(
+          'intent_object_id, agent_address, daily_cap_atomic, per_call_cap_atomic, server_object_ids, allowed_categories, today_spent_atomic, today_epoch_day, expires_at_ms, revoked',
+        )
+        .eq('intent_object_id', intentObjectId)
+        .maybeSingle()) as { data: Record<string, unknown> | null };
+      if (!data) return null;
+      return {
+        intentObjectId: String(data.intent_object_id),
+        agentAddress: String(data.agent_address),
+        dailyCapAtomic: big(data.daily_cap_atomic),
+        perCallCapAtomic: big(data.per_call_cap_atomic),
+        serverObjectIds: Array.isArray(data.server_object_ids)
+          ? (data.server_object_ids as string[])
+          : [],
+        allowedCategories: Array.isArray(data.allowed_categories)
+          ? (data.allowed_categories as string[])
+          : [],
+        todaySpentAtomic: big(data.today_spent_atomic),
+        todayEpochDay:
+          data.today_epoch_day === null || data.today_epoch_day === undefined
+            ? null
+            : Number(data.today_epoch_day),
+        expiresAtMs: Number(data.expires_at_ms ?? 0),
+        revoked: Boolean(data.revoked),
+      };
     },
   };
 }

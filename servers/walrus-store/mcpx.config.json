@@ -1,0 +1,72 @@
+{
+  "namespace": "walrus-store",
+  "name": "Walrus Store",
+  "description": "Agent-native blob storage on Walrus with x402 micropayments. Upload bytes, retrieve by id, inspect metadata, and list your blobs.",
+  "category": "storage",
+  "tags": ["storage", "walrus", "blob", "upload", "agent"],
+  "triggerPhrases": ["store this file", "upload to walrus", "retrieve my blob", "list my files"],
+  "endpointUrl": "https://walrus-store.mcpx.gg",
+  "tools": [
+    {
+      "name": "upload",
+      "description": "Store a blob on Walrus. Content is base64-encoded bytes; optional name and metadata are recorded. Returns the Walrus blob id.",
+      "priceAtomic": "12000",
+      "freeTierCallsPerUser": 1,
+      "timeoutSeconds": 60,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string" },
+          "contentType": { "type": "string" },
+          "name": { "type": "string" },
+          "metadata": { "type": "object" }
+        },
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "retrieve",
+      "description": "Fetch a blob by its Walrus id. Content is returned base64-encoded.",
+      "priceAtomic": "4000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blobId": { "type": "string" }
+        },
+        "required": ["blobId"]
+      }
+    },
+    {
+      "name": "metadata",
+      "description": "Return recorded metadata for a blob: size, content-type, stored epoch, owner, name and custom metadata.",
+      "priceAtomic": "2000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blobId": { "type": "string" }
+        },
+        "required": ["blobId"]
+      }
+    },
+    {
+      "name": "list",
+      "description": "List blobs uploaded through this server, filtered by owner and/or name prefix, newest first.",
+      "priceAtomic": "1000",
+      "freeTierCallsPerUser": 3,
+      "timeoutSeconds": 30,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string" },
+          "prefix": { "type": "string" },
+          "limit": { "type": "number" }
+        },
+        "required": []
+      }
+    }
+  ]
+}

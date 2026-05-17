@@ -3,8 +3,9 @@ import { describe, it } from 'node:test';
 import { createInMemoryStorage } from './storage/in-memory.js';
 import { RecordingPubsub } from './pubsub/pubsub.js';
 import { InMemoryEventSource } from './event-source/in-memory.js';
-import { tick } from './runner.js';
+import { maybeRunAbuseScan, tick } from './runner.js';
 import { NOOP_LOGGER } from './logger.js';
+import { WINDOW_MS } from './abuse.js';
 import type { IndexedEvent } from './types.js';
 
 function ev(eventType: IndexedEvent['eventType'], parsedJson: Record<string, unknown>, txDigest: string, eventSeq: number, checkpoint = 100): IndexedEvent {
@@ -109,6 +110,72 @@ describe('runner.tick', () => {
     await assert.rejects(tick({ storage, pubsub, source, pageSize: 50, logger: NOOP_LOGGER }));
     const cp = await storage.getCheckpoint();
     assert.equal(cp.lastProcessedCheckpoint, 0);
+  });
+
+  it('runs the abuse scan once per closed window', async () => {
+    const storage = createInMemoryStorage();
+    // 12 accounts: 11 quiet, 1 whale — seed request_log via CallSettled.
+    const pubsub = new RecordingPubsub();
+    const win = 5 * WINDOW_MS;
+    const now = win + WINDOW_MS + 1; // priorClosedWindow → [win, win+WINDOW_MS)
+    const tsInWindow = win + 1000;
+    const events: IndexedEvent[] = [];
+    let seq = 0;
+    // 50 quiet accounts: 1 call each.
+    for (let i = 0; i < 50; i++) {
+      events.push(
+        ev(
+          'CallSettled',
+          {
+            receipt_id: `0xr${i}`, server_id: '0xs', payer: `0xq${i}`, tool_name: 't',
+            amount_atomic: '1000', dev_share_atomic: '900',
+            treasury_share_atomic: '80', insurance_share_atomic: '20',
+            log_blob_id: 'b', success: true, timestamp_ms: tsInWindow,
+          },
+          `0xt${seq}`,
+          0,
+          100 + seq++,
+        ),
+      );
+    }
+    // 1 whale: 60 calls — far beyond mean + 3σ of the population.
+    for (let j = 0; j < 60; j++) {
+      events.push(
+        ev(
+          'CallSettled',
+          {
+            receipt_id: `0xrw${j}`, server_id: '0xs', payer: '0xwhale', tool_name: 't',
+            amount_atomic: '1000', dev_share_atomic: '900',
+            treasury_share_atomic: '80', insurance_share_atomic: '20',
+            log_blob_id: 'b', success: true, timestamp_ms: tsInWindow,
+          },
+          `0xtw${seq}`,
+          0,
+          100 + seq++,
+        ),
+      );
+    }
+    const source = new InMemoryEventSource(events);
+    // Drain fully (events > one page) before scanning.
+    let more = true;
+    while (more) {
+      more = (await tick({ storage, pubsub, source, pageSize: 200, logger: NOOP_LOGGER })).hasMore;
+    }
+
+    const first = await maybeRunAbuseScan(storage, 0, now, NOOP_LOGGER);
+    assert.ok(first);
+    assert.equal(first?.scannedBoundaryMs, win + WINDOW_MS);
+    // The whale (60 calls @ 60× the population spend) trips both metrics.
+    const flagged = storage.state.abuseFlags;
+    assert.ok(flagged.length >= 1);
+    assert.ok(flagged.every((f) => f.accountAddress === '0xwhale'));
+    assert.ok(flagged.some((f) => f.metric === 'call_volume'));
+    const flagCount = flagged.length;
+
+    // Same window again → no-op (idempotent on the boundary).
+    const second = await maybeRunAbuseScan(storage, first.scannedBoundaryMs, now, NOOP_LOGGER);
+    assert.equal(second, null);
+    assert.equal(storage.state.abuseFlags.length, flagCount);
   });
 
   it('survives a duplicate batch (rerun)', async () => {

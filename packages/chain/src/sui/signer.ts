@@ -24,28 +24,38 @@ export interface SignAndExecuteResult {
   created: CreatedObject[];
 }
 
+async function keypairFromPrivateKey(
+  privateKey: string,
+): Promise<import('@mysten/sui/keypairs/ed25519').Ed25519Keypair> {
+  const [{ Ed25519Keypair }, { decodeSuiPrivateKey }] = await Promise.all([
+    import('@mysten/sui/keypairs/ed25519'),
+    import('@mysten/sui/cryptography'),
+  ]);
+  if (privateKey.startsWith('suiprivkey')) {
+    const { secretKey } = decodeSuiPrivateKey(privateKey);
+    return Ed25519Keypair.fromSecretKey(secretKey);
+  }
+  const hex = privateKey.replace(/^0x/, '');
+  return Ed25519Keypair.fromSecretKey(Uint8Array.from(Buffer.from(hex, 'hex')));
+}
+
+/**
+ * Derive the Sui address for a raw private key. Used by the quality oracle
+ * (S6-T18) to set the attest PTB sender without importing @mysten/sui.
+ */
+export async function addressFromPrivateKey(privateKey: string): Promise<string> {
+  const keypair = await keypairFromPrivateKey(privateKey);
+  return keypair.getPublicKey().toSuiAddress();
+}
+
 export async function signAndExecuteBase64Tx(
   params: SignAndExecuteParams,
 ): Promise<SignAndExecuteResult> {
-  const [{ SuiClient }, { Ed25519Keypair }, { decodeSuiPrivateKey }] =
-    await Promise.all([
-      import('@mysten/sui/client'),
-      import('@mysten/sui/keypairs/ed25519'),
-      import('@mysten/sui/cryptography'),
-    ]);
+  const { SuiClient } = await import('@mysten/sui/client');
 
   const client = new SuiClient({ url: params.rpcUrl });
 
-  let keypair: import('@mysten/sui/keypairs/ed25519').Ed25519Keypair;
-  if (params.privateKey.startsWith('suiprivkey')) {
-    const { secretKey } = decodeSuiPrivateKey(params.privateKey);
-    keypair = Ed25519Keypair.fromSecretKey(secretKey);
-  } else {
-    const hex = params.privateKey.replace(/^0x/, '');
-    keypair = Ed25519Keypair.fromSecretKey(
-      Uint8Array.from(Buffer.from(hex, 'hex')),
-    );
-  }
+  const keypair = await keypairFromPrivateKey(params.privateKey);
 
   const txBytes = Uint8Array.from(Buffer.from(params.txBytesB64, 'base64'));
   const res = await client.signAndExecuteTransaction({

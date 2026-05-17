@@ -22,7 +22,15 @@ export type GatewayErrorCode =
   | 'settlement_failed'
   | 'platform_paused'
   | 'rate_limited'
-  | 'invalid_request';
+  | 'invalid_request'
+  | 'intent_not_found'
+  | 'intent_revoked'
+  | 'intent_expired'
+  | 'intent_agent_mismatch'
+  | 'intent_scope_mismatch'
+  | 'intent_category_not_allowed'
+  | 'intent_per_call_cap_exceeded'
+  | 'intent_daily_cap_exceeded';
 
 interface JsonRpcError {
   code: number;
@@ -48,6 +56,14 @@ const ERROR_CODE_MAP: Record<GatewayErrorCode, number> = {
   platform_paused: -32015,
   rate_limited: -32016,
   invalid_request: -32600,
+  intent_not_found: -32030,
+  intent_revoked: -32031,
+  intent_expired: -32032,
+  intent_agent_mismatch: -32033,
+  intent_scope_mismatch: -32034,
+  intent_category_not_allowed: -32035,
+  intent_per_call_cap_exceeded: -32036,
+  intent_daily_cap_exceeded: -32037,
 };
 
 const ERROR_MESSAGES: Record<GatewayErrorCode, string> = {
@@ -69,6 +85,19 @@ const ERROR_MESSAGES: Record<GatewayErrorCode, string> = {
   platform_paused: 'The platform is temporarily paused. Please try again later.',
   rate_limited: 'Rate limit exceeded. Please try again later.',
   invalid_request: 'Invalid JSON-RPC request.',
+  intent_not_found: 'The supplied spending intent was not found.',
+  intent_revoked: 'This spending intent has been revoked by its owner.',
+  intent_expired: 'This spending intent has expired.',
+  intent_agent_mismatch:
+    'The caller is not the agent authorised by this spending intent.',
+  intent_scope_mismatch:
+    'This server is not within the spending intent scope.',
+  intent_category_not_allowed:
+    "This tool's category is not permitted by the spending intent.",
+  intent_per_call_cap_exceeded:
+    'This call exceeds the per-call cap on the spending intent.',
+  intent_daily_cap_exceeded:
+    'This call would exceed the daily cap on the spending intent.',
 };
 
 export class GatewayError extends Error {

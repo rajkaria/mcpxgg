@@ -29,7 +29,10 @@ export interface SettleSubmitParams {
   serverObjectId: string;
   toolName: string;
   amountAtomic: bigint;
+  /** Spending-intent object id. Present → `settle_call_with_intent`. */
   intentId?: string;
+  /** Tool category bytes for the intent's category check. '' if none. */
+  category?: string;
   /** Receipt-blob id from the gateway's Walrus upload; '' if none. */
   logBlobId: string;
   /** Whether the underlying server call succeeded. */

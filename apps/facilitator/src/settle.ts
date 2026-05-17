@@ -48,6 +48,11 @@ export async function settlePayment(
   }
 
   const payload = parsePaymentPayloadWire(input.payload);
+  const intentCategory =
+    payload.intentId !== undefined &&
+    typeof payload.details.metadata?.intentCategory === 'string'
+      ? (payload.details.metadata.intentCategory as string)
+      : '';
   try {
     const result = await backend.submitSettle({
       payerAddress: payload.payerAddress,
@@ -55,7 +60,10 @@ export async function settlePayment(
       serverObjectId: payload.details.serverObjectId,
       toolName: payload.details.toolName,
       amountAtomic: BigInt(payload.details.amountAtomic),
-      ...(payload.intentId !== undefined && { intentId: payload.intentId }),
+      ...(payload.intentId !== undefined && {
+        intentId: payload.intentId,
+        category: intentCategory,
+      }),
       logBlobId: input.receiptBlobId ?? '',
       success: input.success ?? true,
     });

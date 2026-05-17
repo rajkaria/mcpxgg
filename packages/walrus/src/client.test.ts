@@ -8,7 +8,7 @@ import {
   sealEncrypt,
   sealDecrypt,
   WalrusError,
-} from './index.js';
+} from './index';
 
 test('in-memory client round-trips JSON', async () => {
   const w = createWalrusClient();

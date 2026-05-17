@@ -3,9 +3,9 @@
  * by `pnpm dev` when no Walrus publisher is configured.
  */
 
-import type { StoredBlob, WalrusBackend } from './backend.js';
-import { WalrusError } from './backend.js';
-import { contentBlobId } from './hash.js';
+import type { StoredBlob, WalrusBackend } from './backend';
+import { WalrusError } from './backend';
+import { contentBlobId } from './hash';
 
 export interface InMemoryWalrusBackend extends WalrusBackend {
   /** Number of distinct blobs stored. */

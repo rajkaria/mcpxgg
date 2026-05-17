@@ -8,6 +8,7 @@ export const handleIntentCreated: Handler = async (event, ctx) => {
     userAddress: asAddress(f.user, 'user'),
     agentAddress: asAddress(f.agent, 'agent'),
     dailyCapAtomic: asBigint(f.daily_cap_atomic, 'daily_cap_atomic'),
+    perCallCapAtomic: asBigint(f.per_call_cap_atomic, 'per_call_cap_atomic'),
     expiresAtMs: asNumber(f.expires_at_ms, 'expires_at_ms'),
     txDigest: event.txDigest,
   });

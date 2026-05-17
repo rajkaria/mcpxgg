@@ -162,6 +162,8 @@ export interface IntentCreate {
   userAddress: string;
   agentAddress: string;
   dailyCapAtomic: bigint;
+  /** Per-call spend ceiling in USDsui atomic units (S6-T04). 0 = uncapped. */
+  perCallCapAtomic: bigint;
   expiresAtMs: number;
   txDigest: string;
 }
@@ -220,6 +222,24 @@ export interface ReviewRecord {
   txDigest: string;
 }
 
+// ─── Abuse flags (S6-T26) ────────────────────────────────────────────────
+
+export interface AccountAggregate {
+  accountAddress: string;
+  callVolume: number;
+  spendAtomic: bigint;
+}
+
+export interface AbuseFlagInsert {
+  accountAddress: string;
+  /** Which population aggregate tripped: 'call_volume' | 'spend_atomic'. */
+  metric: 'call_volume' | 'spend_atomic';
+  /** Standard deviations above the population mean (>= 3.0 to flag). */
+  zscore: number;
+  windowStartMs: number;
+  windowEndMs: number;
+}
+
 // ─── Storage interface ──────────────────────────────────────────────────
 
 export interface Storage {
@@ -262,6 +282,15 @@ export interface Storage {
   recordBundleActivation(u: BundleActivation): Promise<void>;
 
   insertReview(u: ReviewRecord): Promise<void>;
+
+  // ─── Abuse detection (S6-T26) ─────────────────────────────────────────
+  /**
+   * Per-account call volume + spend over a closed window, computed from the
+   * chain-mirror `request_log`. Used by the abuse heuristic; pure compute
+   * lives in `abuse.ts` so this only does the aggregate read.
+   */
+  getAccountAggregates(windowStartMs: number, windowEndMs: number): Promise<AccountAggregate[]>;
+  insertAbuseFlag(u: AbuseFlagInsert): Promise<void>;
 
   // ─── Checkpoint ───────────────────────────────────────────────────────
 

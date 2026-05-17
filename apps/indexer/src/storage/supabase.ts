@@ -9,6 +9,8 @@
 
 import type { ChainId } from '@mcpxgg/shared';
 import type {
+  AbuseFlagInsert,
+  AccountAggregate,
   BundleActivation,
   BundleCreation,
   CheckpointState,
@@ -283,6 +285,7 @@ export async function createSupabaseStorage(
           user_address: u.userAddress,
           agent_address: u.agentAddress,
           daily_cap_atomic: asString(u.dailyCapAtomic),
+          per_call_cap_atomic: asString(u.perCallCapAtomic),
           expires_at_ms: u.expiresAtMs,
           tx_digest: u.txDigest,
           status: 'active',
@@ -379,6 +382,42 @@ export async function createSupabaseStorage(
         { onConflict: 'review_object_id' },
       );
       if (error) throw new Error(`insertReview: ${error.message}`);
+    },
+
+    async getAccountAggregates(
+      windowStartMs: number,
+      windowEndMs: number,
+    ): Promise<AccountAggregate[]> {
+      // GROUP BY isn't expressible via supabase-js query builder; the
+      // `account_aggregates` SQL function (migration 011) does it server-side
+      // over the chain-mirror request_log.
+      const { data, error } = await sb.rpc('account_aggregates', {
+        p_window_start: new Date(windowStartMs).toISOString(),
+        p_window_end: new Date(windowEndMs).toISOString(),
+      });
+      if (error) throw new Error(`getAccountAggregates: ${error.message}`);
+      const rows = (data ?? []) as {
+        account_address: string;
+        call_volume: number | string;
+        spend_atomic: number | string;
+      }[];
+      return rows.map((r) => ({
+        accountAddress: r.account_address,
+        callVolume: Number(r.call_volume),
+        spendAtomic: BigInt(r.spend_atomic),
+      }));
+    },
+
+    async insertAbuseFlag(u: AbuseFlagInsert): Promise<void> {
+      const { error } = await sb.from('abuse_flags').insert({
+        account_address: u.accountAddress,
+        metric: u.metric,
+        zscore: u.zscore,
+        window_start_ms: u.windowStartMs,
+        window_end_ms: u.windowEndMs,
+        status: 'pending',
+      });
+      if (error) throw new Error(`insertAbuseFlag: ${error.message}`);
     },
 
     async getCheckpoint(): Promise<CheckpointState> {

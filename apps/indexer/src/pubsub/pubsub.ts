@@ -35,13 +35,24 @@ export class RecordingPubsub implements Pubsub {
 /**
  * Real Redis pubsub via Upstash. Loaded lazily so tests need no
  * `@upstash/redis` install.
+ *
+ * In addition to PUBLISH (for any future native subscriber), each payload is
+ * LPUSH'd onto a capped log list `<channel>:log` (kept to the last 200). The
+ * web `/live` SSE route (S6-T15) polls that list because Upstash's REST
+ * client can't hold a long-lived SUBSCRIBE connection.
  */
+const LIVE_LOG_MAX = 200;
+
 export async function createRedisPubsub(redisUrl: string, redisToken: string): Promise<Pubsub> {
   const { Redis } = await import('@upstash/redis');
   const client = new Redis({ url: redisUrl, token: redisToken });
   return {
     async publish(channel, payload): Promise<void> {
-      await client.publish(channel, JSON.stringify(payload, bigintReplacer));
+      const json = JSON.stringify(payload, bigintReplacer);
+      await client.publish(channel, json);
+      const logKey = `${channel}:log`;
+      await client.lpush(logKey, json);
+      await client.ltrim(logKey, 0, LIVE_LOG_MAX - 1);
     },
   };
 }

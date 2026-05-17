@@ -78,7 +78,7 @@ fun access_zero_expiry_aborts() {
 fun intent_create_revoke_round_trip() {
     let mut sc = ts::begin(USER);
     let clk = clock::create_for_testing(sc.ctx());
-    let intent_id = intent::create(AGENT, 5_000, vector[], 9_999_999, &clk, sc.ctx());
+    let intent_id = intent::create(AGENT, 5_000, 0, vector[], vector[], 9_999_999, &clk, sc.ctx());
 
     sc.next_tx(USER);
     {
@@ -100,7 +100,7 @@ fun intent_create_revoke_round_trip() {
 fun intent_zero_agent_aborts() {
     let mut sc = ts::begin(USER);
     let clk = clock::create_for_testing(sc.ctx());
-    intent::create(@0x0, 1_000, vector[], 0, &clk, sc.ctx());
+    intent::create(@0x0, 1_000, 0, vector[], vector[], 0, &clk, sc.ctx());
     clock::destroy_for_testing(clk);
     sc.end();
 }

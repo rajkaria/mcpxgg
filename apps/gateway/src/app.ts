@@ -42,7 +42,12 @@ export function createApp(deps: GatewayDeps): Hono {
       );
     }
 
-    const res = await handleMcpRequest(body, auth, deps);
+    const intentId = c.req.header('x-mcpx-intent-id');
+    const category = c.req.header('x-mcpx-category');
+    const res = await handleMcpRequest(body, auth, deps, {
+      ...(intentId ? { intentId } : {}),
+      ...(category ? { category } : {}),
+    });
     return c.json(res);
   });
 

@@ -5,6 +5,8 @@
 
 import type { ChainId } from '@mcpxgg/shared';
 import type {
+  AbuseFlagInsert,
+  AccountAggregate,
   BundleActivation,
   BundleCreation,
   CheckpointState,
@@ -82,6 +84,7 @@ export interface InMemoryState {
   stakes: Map<string, StakeRecord & { slashes: StakeSlash[] }>;
   bundles: Map<string, BundleCreation & { activations: BundleActivation[] }>;
   reviews: ReviewRecord[];
+  abuseFlags: AbuseFlagInsert[];
   seenEvents: Set<string>;
   checkpoint: CheckpointState;
 }
@@ -111,6 +114,7 @@ export function createInMemoryStorage(chainId: ChainId = 'sui'): Storage & { sta
     stakes: new Map(),
     bundles: new Map(),
     reviews: [],
+    abuseFlags: [],
     seenEvents: new Set(),
     checkpoint: { lastProcessedCheckpoint: 0, lastProcessedEventSeq: 0, lastTxDigest: null },
   };
@@ -300,6 +304,29 @@ export function createInMemoryStorage(chainId: ChainId = 'sui'): Storage & { sta
 
     async insertReview(u: ReviewRecord): Promise<void> {
       state.reviews.push(u);
+    },
+
+    async getAccountAggregates(
+      windowStartMs: number,
+      windowEndMs: number,
+    ): Promise<AccountAggregate[]> {
+      const byAccount = new Map<string, { callVolume: number; spendAtomic: bigint }>();
+      for (const r of state.requestLog) {
+        if (r.timestampMs < windowStartMs || r.timestampMs >= windowEndMs) continue;
+        const cur = byAccount.get(r.payerAddress) ?? { callVolume: 0, spendAtomic: 0n };
+        cur.callVolume += 1;
+        cur.spendAtomic += r.amountAtomic;
+        byAccount.set(r.payerAddress, cur);
+      }
+      return [...byAccount.entries()].map(([accountAddress, v]) => ({
+        accountAddress,
+        callVolume: v.callVolume,
+        spendAtomic: v.spendAtomic,
+      }));
+    },
+
+    async insertAbuseFlag(u: AbuseFlagInsert): Promise<void> {
+      state.abuseFlags.push(u);
     },
 
     async getCheckpoint(): Promise<CheckpointState> {

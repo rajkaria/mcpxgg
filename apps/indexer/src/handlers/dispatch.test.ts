@@ -348,6 +348,7 @@ describe('dispatch — admin, quality, stubs', () => {
         user: '0xuser',
         agent: '0xagent',
         daily_cap_atomic: '5000000',
+        per_call_cap_atomic: '250000',
         expires_at_ms: 0,
       }),
       { storage, pubsub },
@@ -367,6 +368,7 @@ describe('dispatch — admin, quality, stubs', () => {
     const intent = storage.state.intents.get('0xi');
     assert.equal(intent?.revoked, true);
     assert.equal(intent?.usages.length, 1);
+    assert.equal(intent?.perCallCapAtomic, 250_000n);
   });
 
   it('records stake and slash', async () => {

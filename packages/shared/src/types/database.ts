@@ -163,6 +163,74 @@ export interface IndexerCheckpointRow {
   last_processed_at: string;
 }
 
+// ─── Quality / intents / staking / abuse mirrors (S6) ─────────────────────
+
+/** Indexer mirror of mcpx::quality::QualityAttestation (migration 010). */
+export interface QualityAttestationRow {
+  attestation_object_id: string;
+  chain_id: ChainId;
+  server_object_id: string;
+  /** Composite quality score ×100, 0..10000. */
+  score_x100: number;
+  uptime_x100: number;
+  p95_latency_ms: number;
+  error_rate_x100: number;
+  sample_count: bigint;
+  observed_at: string;
+  tx_digest: string;
+  // Migration 010 additions (nullable: the QualityAttested event only
+  // carries timestamp_ms; window + attester come from the oracle/object).
+  window_start_ms: number | null;
+  window_end_ms: number | null;
+  attested_by: string | null;
+  attested_at_ms: number | null;
+  indexed_at: string;
+  recorded_at: string;
+}
+
+/** Indexer mirror of a SpendingIntent (migration 007 + 011 additions). */
+export interface IntentRow {
+  intent_object_id: string;
+  chain_id: ChainId;
+  user_address: string;
+  agent_address: string;
+  daily_cap_atomic: bigint;
+  /** Per-call spend ceiling, atomic units. 0 = uncapped (migration 011). */
+  per_call_cap_atomic: bigint;
+  /** Category allowlist. Empty = any (migration 011). */
+  allowed_categories: string[];
+  expires_at_ms: number;
+  status: 'active' | 'revoked' | 'expired';
+  tx_digest: string;
+  created_at: string;
+}
+
+/** Indexer mirror of an mcpx::staking server stake (migration 011, S7). */
+export interface ServerStakeRow {
+  stake_object_id: string;
+  chain_id: ChainId;
+  server_object_id: string;
+  staker: string;
+  amount_atomic: bigint;
+  staked_at_ms: number;
+  withdrawn: boolean;
+  tx_digest: string;
+  indexed_at: string;
+}
+
+/** Indexer abuse-heuristic output (S6-T26, migration 011). */
+export interface AbuseFlagRow {
+  id: number;
+  account_address: string;
+  metric: 'call_volume' | 'spend_atomic';
+  /** Std deviations above the population mean (>= 3 to be flagged). */
+  zscore: number;
+  window_start_ms: number;
+  window_end_ms: number;
+  status: 'pending' | 'reviewed' | 'dismissed' | 'actioned';
+  created_at: string;
+}
+
 // ─── Discriminator helpers ────────────────────────────────────────────────
 
 export const ALL_CHAIN_IDS: readonly ChainId[] = ['sui', 'base', 'solana'] as const;

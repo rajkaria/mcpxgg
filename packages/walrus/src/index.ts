@@ -10,21 +10,21 @@
  *   const obj = await walrus.retrieveJSON(blobId);
  */
 
-import type { WalrusBackend } from './backend.js';
-import { WalrusError } from './backend.js';
-import { createInMemoryWalrusBackend } from './in-memory.js';
-import { createHttpWalrusBackend } from './http.js';
+import type { WalrusBackend } from './backend';
+import { WalrusError } from './backend';
+import { createInMemoryWalrusBackend } from './in-memory';
+import { createHttpWalrusBackend } from './http';
 
 export const PACKAGE_VERSION = '0.2.0';
 
-export type { WalrusBackend, StoredBlob, WalrusErrorCode } from './backend.js';
-export { WalrusError } from './backend.js';
-export { createInMemoryWalrusBackend } from './in-memory.js';
-export type { InMemoryWalrusBackend } from './in-memory.js';
-export { createHttpWalrusBackend } from './http.js';
-export type { HttpWalrusOptions } from './http.js';
-export { sealEncrypt, sealDecrypt } from './seal.js';
-export type { SealEnvelope } from './seal.js';
+export type { WalrusBackend, StoredBlob, WalrusErrorCode } from './backend';
+export { WalrusError } from './backend';
+export { createInMemoryWalrusBackend } from './in-memory';
+export type { InMemoryWalrusBackend } from './in-memory';
+export { createHttpWalrusBackend } from './http';
+export type { HttpWalrusOptions } from './http';
+export { sealEncrypt, sealDecrypt } from './seal';
+export type { SealEnvelope } from './seal';
 
 export interface BlobMetadata {
   blobId: string;

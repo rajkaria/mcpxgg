@@ -8,8 +8,8 @@
  *   { "alreadyCertified": { "blobId": "..." } }                   — dedup hit
  */
 
-import type { StoredBlob, WalrusBackend } from './backend.js';
-import { WalrusError } from './backend.js';
+import type { StoredBlob, WalrusBackend } from './backend';
+import { WalrusError } from './backend';
 
 export interface HttpWalrusOptions {
   publisherUrl: string;

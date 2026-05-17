@@ -1,0 +1,28 @@
+# Fly.io app for the walrus-store anchor server (S6-T09/T10).
+# Optional secrets: WALRUS_PUBLISHER_URL / WALRUS_AGGREGATOR_URL (real Walrus),
+# WALRUS_EPOCHS. Defaults are hermetic: in-memory Walrus backend.
+app = "mcpxgg-walrus-store"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3013"
+
+[http_service]
+  internal_port = 3013
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "15s"
+  timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

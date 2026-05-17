@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getActiveChain } from "@mcpxgg/chain";
 import { createClient } from "@/lib/supabase/server";
 import { getMarketplaceServer, usdsui } from "@/lib/chain/reads";
+import { QualityBadge } from "@/components/QualityBadge";
+import { DemoCallButton } from "@/components/DemoCallButton";
 import { ServerDetailClient } from "./server-detail-client";
 
 const WALRUS_AGG =
@@ -148,6 +150,7 @@ export default async function ServerDetailPage({
                   {s.category}
                 </span>
               )}
+              <QualityBadge scoreX100={view?.qualityScoreX100} size="md" />
             </div>
             <p
               className="text-sm font-mono mb-3"
@@ -218,8 +221,9 @@ export default async function ServerDetailPage({
               </div>
             </div>
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 space-y-3">
             <ServerDetailClient serverId={s.id} serverName={s.name} />
+            <DemoCallButton serverObjectId={view?.objectId ?? null} />
           </div>
         </div>
 
