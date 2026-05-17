@@ -293,28 +293,44 @@ across all 21 packages.
 
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
-| S4-T01 | Privy SDK install + `<PrivyProvider>` in `apps/web/app/layout.tsx`; configure Sui wallet support | apps/web | M | ☐ |
-| S4-T02 | Replace existing Supabase Auth login UI with `<PrivyConnect />` component | apps/web | M | ☐ |
-| S4-T03 | Privy server-side: validate session token in middleware; populate `users.sui_address` on first sign-in | apps/web | M | ☐ |
-| S4-T04 | Schema: ALTER `users` add `sui_address` (nullable, populated on first wallet sign), `migration_status` ('legacy'|'migrating'|'migrated') | supabase | S | ☐ |
-| S4-T05 | API key auto-generation on first sign-in; rebind to a new on-chain Session | apps/web + apps/gateway | M | ☐ |
-| S4-T06 | `<RechargeFlow />` component: Privy wallet connect → input amount in USD → quote in USDsui via current rate → sign deposit tx | apps/web | L | ☐ |
-| S4-T07 | First Session creation flow: if user has no Session yet, recharge creates one (PTB: createSession + deposit in one tx) | apps/web + packages/chain | M | ☐ |
-| S4-T08 | `<SessionBalance />` widget on dashboard reading from `chain_balances` view | apps/web | M | ☐ |
-| S4-T09 | `/dashboard/usage` rebuilt to show receipt links per row (tx_digest → suiscan.xyz, blob_id → walrus viewer) | apps/web | M | ☐ |
-| S4-T10 | `/receipts/[id]` page: fetch CallReceipt object via Sui RPC → fetch Walrus blob → render request/response | apps/web | L | ☐ |
-| S4-T11 | Seal-encrypted receipt viewer: if blob is Seal'd, show metadata + "Decrypt as caller" / "Decrypt as server owner" buttons | apps/web + packages/walrus | L | ☐ |
+| S4-T01 | Privy SDK install + `<PrivyProvider>` in `apps/web/app/layout.tsx`; configure Sui wallet support | apps/web | M | ✓ |
+| S4-T02 | Replace existing Supabase Auth login UI with `<PrivyConnect />` component | apps/web | M | ✓ |
+| S4-T03 | Privy server-side: validate session token in middleware; populate `users.sui_address` on first sign-in | apps/web | M | ✓ |
+| S4-T04 | Schema: ALTER `users` add `sui_address` (nullable, populated on first wallet sign), `migration_status` ('legacy'|'migrating'|'migrated') | supabase | S | ✓ |
+| S4-T05 | API key auto-generation on first sign-in; rebind to a new on-chain Session | apps/web + apps/gateway | M | ✓ |
+| S4-T06 | `<RechargeFlow />` component: Privy wallet connect → input amount in USD → quote in USDsui via current rate → sign deposit tx | apps/web | L | ✓ |
+| S4-T07 | First Session creation flow: if user has no Session yet, recharge creates one (PTB: createSession + deposit in one tx) | apps/web + packages/chain | M | ✓ |
+| S4-T08 | `<SessionBalance />` widget on dashboard reading from `chain_balances` view | apps/web | M | ✓ |
+| S4-T09 | `/dashboard/usage` rebuilt to show receipt links per row (tx_digest → suiscan.xyz, blob_id → walrus viewer) | apps/web | M | ✓ |
+| S4-T10 | `/receipts/[id]` page: fetch CallReceipt object via Sui RPC → fetch Walrus blob → render request/response | apps/web | L | ✓ |
+| S4-T11 | Seal-encrypted receipt viewer: if blob is Seal'd, show metadata + "Decrypt as caller" / "Decrypt as server owner" buttons | apps/web + packages/walrus | L | ✓ |
 | S4-T12 | Marketplace browse rebuilt to read `marketplace_servers` view; "View on chain" + Walrus README link per server | apps/web | M | ☐ |
 | S4-T13 | Server detail page (`/marketplace/[namespace]`): fetch full server + tools from view; render Walrus README | apps/web | M | ☐ |
 | S4-T14 | `/setup` setup-wizard page: pick client (Cursor / Claude Desktop / Windsurf / Cline / API), get exact JSON config to copy | apps/web | M | ☐ |
 | S4-T15 | Bootstrap subsidy grant flow: on phone-verify success, grant 1.00 USDsui to user's first Session via admin-signed tx | apps/web + apps/facilitator | M | ☐ |
 | S4-T16 | Subsidy budget tracking: monthly cap enforced via `PlatformConfig`; admin script to refill | apps/facilitator | S | ☐ |
-| S4-T17 | Audit log CSV export from `/dashboard/usage` (all request_log rows for user) | apps/web | S | ☐ |
+| S4-T17 | Audit log CSV export from `/dashboard/usage` (all request_log rows for user) | apps/web | S | ✓ |
 | S4-T18 | Live ticker on landing page: top right "$X cumulative settled, Y calls today" | apps/web | M | ☐ |
 | S4-T19 | Updated landing copy across `/`, `/about`, `/pricing`, `/developers`: "USDsui", "wallet", remove credit/subscription language | apps/web | M | ☐ |
 | S4-T20 | Posthog product analytics installed in `apps/web` | apps/web | S | ☐ |
 | S4-T21 | Sentry error tracking in `apps/web`, `apps/gateway`, `apps/facilitator`, `apps/indexer` | observability | M | ☐ |
 | S4-T22 | E2E test: signup via Privy Google → recharge $5 → call walrus-search → see receipt in dashboard → click receipt → see Walrus blob | tests | L | ☐ |
+
+**Sprint 4 status (2026-05-17).** Auth + payments + receipts slice complete
+and type-clean (web `tsc --noEmit` green; 32/32 turbo typecheck+test).
+Done: S4-T01–T11 + T17 — Privy provider/login/server-verify, `users`
+sui_address/privy_did/migration_status migration (008), API-key bind
+(`/api/auth/session`), `packages/chain` real (InMemorySuiAdapter +
+`buildCreateSessionAndDepositTx`/`buildDepositTx`/`buildWithdrawTx`, address
+helpers, 5 tests), `<RechargeFlow/>` + `/api/session/recharge` (create-or-
+deposit PTB), `<SessionBalance/>`, chain-backed `/dashboard/usage` with
+suiscan/Walrus links, `/receipts/[id]` + `<SealReceiptViewer/>`, CSV export.
+Dashboard auth cut over from Supabase Auth to Privy. Outstanding (next
+session): T12/T13 marketplace+detail from `marketplace_servers` view, T14
+`/setup` wizard, T15/T16 subsidy grant+budget, T18 live ticker, T19 landing
+copy, T20 Posthog, T21 Sentry, T22 Privy E2E (needs live Privy creds, like
+S1–S3 credentialed deploys). The `reads.ts` mirror layer + view types are in
+place so the remaining read-only pages are now small.
 
 **Definition of Done.**
 - Cold-start user flow: Privy sign-in → recharge → call → see receipt in <2 minutes

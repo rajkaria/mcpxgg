@@ -29,6 +29,7 @@ import type {
   EventSubscription,
   FacilitatorClient,
 } from './types';
+import { normalizeSuiAddress } from './sui/address';
 
 class NotImplemented extends Error {
   constructor(method: string, sprint: string) {
@@ -62,23 +63,41 @@ export class SuiAdapter implements ChainAdapter {
   };
 
   async resolveIdentity(_authToken: string): Promise<Identity> {
-    throw new NotImplemented('resolveIdentity', '4');
+    // Privy access-token verification is server-only (needs the Privy app
+    // secret). apps/web does it in lib/privy/server.ts; the adapter stays
+    // key/secret-free by design.
+    throw new Error(
+      'SuiAdapter.resolveIdentity: verify Privy tokens in apps/web (lib/privy/server.ts)',
+    );
   }
 
-  async deriveAddress(_authIdentity: AuthIdentity): Promise<string> {
-    throw new NotImplemented('deriveAddress', '4');
+  async deriveAddress(authIdentity: AuthIdentity): Promise<string> {
+    // Privy embedded wallets already yield a Sui address; for an external
+    // wallet the subject *is* the address. Social logins resolve to their
+    // Privy-derived embedded wallet address (looked up in apps/web), not here.
+    if (authIdentity.provider === 'wallet') {
+      return normalizeSuiAddress(authIdentity.subject);
+    }
+    throw new Error(
+      `SuiAdapter.deriveAddress: resolve ${authIdentity.provider} via Privy embedded wallet in apps/web`,
+    );
   }
 
+  // Session mutations are signed by the user's wallet in the browser — the
+  // server never holds the key. Use the PTB builders + Privy to sign:
+  //   buildCreateSessionAndDepositTx / buildDepositTx / buildWithdrawTx
   async createSession(_params: CreateSessionParams): Promise<{ session: Session; tx: TxResult }> {
-    throw new NotImplemented('createSession', '4');
+    throw new Error(
+      'SuiAdapter.createSession: build the PTB with buildCreateSessionAndDepositTx and sign via Privy',
+    );
   }
 
   async depositToSession(_sessionObjectId: string, _amountAtomic: bigint): Promise<TxResult> {
-    throw new NotImplemented('depositToSession', '4');
+    throw new Error('SuiAdapter.depositToSession: use buildDepositTx + Privy wallet signing');
   }
 
   async withdrawFromSession(_sessionObjectId: string, _amountAtomic: bigint): Promise<TxResult> {
-    throw new NotImplemented('withdrawFromSession', '4');
+    throw new Error('SuiAdapter.withdrawFromSession: use buildWithdrawTx + Privy wallet signing');
   }
 
   async publishServer(

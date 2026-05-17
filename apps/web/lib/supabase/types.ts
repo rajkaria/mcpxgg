@@ -29,6 +29,9 @@ export interface Database {
           billing_cycle_anchor: string | null;
           plan_credits_per_cycle: number;
           plan_rollover_cap: number;
+          sui_address: string | null;
+          privy_did: string | null;
+          migration_status: "legacy" | "migrating" | "migrated";
           created_at: string;
           updated_at: string;
         };
@@ -51,6 +54,9 @@ export interface Database {
           billing_cycle_anchor?: string | null;
           plan_credits_per_cycle?: number;
           plan_rollover_cap?: number;
+          sui_address?: string | null;
+          privy_did?: string | null;
+          migration_status?: "legacy" | "migrating" | "migrated";
           created_at?: string;
           updated_at?: string;
         };
@@ -73,6 +79,9 @@ export interface Database {
           billing_cycle_anchor?: string | null;
           plan_credits_per_cycle?: number;
           plan_rollover_cap?: number;
+          sui_address?: string | null;
+          privy_did?: string | null;
+          migration_status?: "legacy" | "migrating" | "migrated";
           created_at?: string;
           updated_at?: string;
         };
@@ -254,6 +263,16 @@ export interface Database {
           request_meta: Record<string, unknown>;
           response_meta: Record<string, unknown>;
           created_at: string;
+          chain_id: string | null;
+          receipt_object_id: string | null;
+          tx_digest: string | null;
+          session_object_id: string | null;
+          amount_atomic: number | string | null;
+          dev_share_atomic: number | string | null;
+          treasury_share_atomic: number | string | null;
+          insurance_share_atomic: number | string | null;
+          receipt_blob_id: string | null;
+          intent_object_id: string | null;
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
@@ -324,7 +343,81 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      chain_balances: {
+        Row: {
+          session_object_id: string;
+          chain_id: string;
+          user_id: string | null;
+          owner_address: string;
+          balance_atomic: number | string;
+          per_call_cap_atomic: number | string;
+          per_day_cap_atomic: number | string;
+          today_spent_atomic: number | string;
+          today_epoch_day: number | null;
+          scoped_server_object_ids: string[] | null;
+          expires_at_ms: number | null;
+          active: boolean;
+          lifetime_deposited_atomic: number | string;
+          lifetime_spent_atomic: number | string;
+          last_tx_digest: string | null;
+          last_synced_at: string | null;
+        };
+        Relationships: [];
+      };
+      developer_vaults: {
+        Row: {
+          vault_object_id: string;
+          chain_id: string;
+          developer_id: string | null;
+          owner_address: string;
+          accrued_balance_atomic: number | string;
+          lifetime_earnings_atomic: number | string;
+          lifetime_claimed_atomic: number | string;
+          auto_claim_threshold_atomic: number | string;
+          last_tx_digest: string | null;
+        };
+        Relationships: [];
+      };
+      marketplace_servers: {
+        Row: {
+          object_id: string;
+          namespace: string;
+          name: string | null;
+          description: string | null;
+          category: string | null;
+          owner_address: string | null;
+          endpoint_url: string | null;
+          metadata_blob_id: string | null;
+          tx_digest: string | null;
+          on_chain_version: number | null;
+          tool_count: number | null;
+          created_at: string | null;
+        };
+        Relationships: [];
+      };
+      dashboard_usage: {
+        Row: {
+          owner_address: string | null;
+          user_id: string | null;
+          calls: number | null;
+          gross_atomic: number | string | null;
+          dev_atomic: number | string | null;
+          created_at: string | null;
+        };
+        Relationships: [];
+      };
+      live_feed_24h: {
+        Row: {
+          tx_digest: string | null;
+          namespace: string | null;
+          tool_name: string | null;
+          amount_atomic: number | string | null;
+          created_at: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

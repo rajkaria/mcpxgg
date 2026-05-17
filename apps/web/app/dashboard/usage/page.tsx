@@ -1,134 +1,104 @@
-"use client";
+/**
+ * /dashboard/usage (S4-T09) — chain-backed. One row per CallReceipt with a
+ * suiscan link (tx_digest) and a Walrus link (receipt_blob_id). Reads the
+ * request_log mirror; no chain RPC. CSV export at S4-T17.
+ */
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useUser } from "@/components/dashboard/user-context";
-import { Card, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { getActiveChain } from "@mcpxgg/chain";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { listReceipts, usdsui } from "@/lib/chain/reads";
+import { SessionBalance } from "@/components/SessionBalance";
+import { RechargeFlow } from "@/components/RechargeFlow";
 
-interface RequestLogEntry {
-  id: string;
-  tool_name: string;
-  credit_cost: number;
-  status: string;
-  response_time_ms: number | null;
-  error_message: string | null;
-  created_at: string;
-}
+const WALRUS_AGG =
+  process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR_URL ??
+  "https://aggregator.walrus-testnet.walrus.space";
 
-const STATUS_COLORS: Record<string, string> = {
-  success: "text-[var(--success)]",
-  error: "text-[var(--error)]",
-  timeout: "text-[var(--warning)]",
-  refunded: "text-[var(--text-muted)]",
-};
+export const metadata = { title: "Usage | MCPX" };
 
-export default function UsagePage() {
-  const user = useUser();
-  const supabase = createClient();
-  const [entries, setEntries] = useState<RequestLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const pageSize = 20;
-
-  useEffect(() => {
-    loadEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  const loadEntries = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("request_log")
-      .select("id, tool_name, credit_cost, status, response_time_ms, error_message, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = (data as any) || [];
-    setEntries(rows);
-    setHasMore(rows.length === pageSize);
-    setLoading(false);
-  };
+export default async function UsagePage() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return <p className="text-sm">Sign in to view usage.</p>;
+  }
+  const receipts = await listReceipts(user.id);
+  const chain = getActiveChain();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-[var(--text)]">Usage History</h1>
-      <p className="mt-1 text-sm text-[var(--text-secondary)]">
-        Your MCP tool call history
-      </p>
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        <SessionBalance />
+        <div className="rounded-lg border border-[var(--border)] p-4">
+          <h2 className="mb-2 text-sm font-semibold">Recharge</h2>
+          <RechargeFlow />
+        </div>
+      </div>
 
-      <Card className="mt-6">
-        <CardTitle>Request Log</CardTitle>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[var(--text-muted)]">
-                <th className="pb-2 font-medium">Time</th>
-                <th className="pb-2 font-medium">Tool</th>
-                <th className="pb-2 font-medium">Credits</th>
-                <th className="pb-2 font-medium">Status</th>
-                <th className="pb-2 text-right font-medium">Latency</th>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Call receipts</h1>
+        <a className="btn btn-ghost text-sm" href="/api/dashboard/usage/export">
+          Export CSV
+        </a>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+        <table className="w-full text-sm">
+          <thead className="text-left opacity-60">
+            <tr>
+              <th className="p-2">When</th>
+              <th className="p-2">Tool</th>
+              <th className="p-2">Status</th>
+              <th className="p-2">Amount</th>
+              <th className="p-2">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {receipts.length === 0 && (
+              <tr>
+                <td className="p-3 opacity-60" colSpan={5}>
+                  No calls yet. Recharge and call a server through the gateway.
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="py-4 text-center text-[var(--text-muted)]">
-                    Loading...
-                  </td>
-                </tr>
-              ) : entries.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-4 text-center text-[var(--text-muted)]">
-                    No usage yet
-                  </td>
-                </tr>
-              ) : (
-                entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="py-2 text-[var(--text-secondary)]">
-                      {new Date(entry.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-2 font-mono text-xs text-[var(--text)]">
-                      {entry.tool_name}
-                    </td>
-                    <td className="py-2 text-[var(--text)]">{entry.credit_cost}</td>
-                    <td className={`py-2 ${STATUS_COLORS[entry.status] || ""}`}>
-                      {entry.status}
-                    </td>
-                    <td className="py-2 text-right text-[var(--text-secondary)]">
-                      {entry.response_time_ms ? `${entry.response_time_ms}ms` : "—"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-          >
-            Previous
-          </Button>
-          <span className="text-xs text-[var(--text-muted)]">Page {page + 1}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage(page + 1)}
-            disabled={!hasMore}
-          >
-            Next
-          </Button>
-        </div>
-      </Card>
+            )}
+            {receipts.map((r) => (
+              <tr key={r.id} className="border-t border-[var(--border)]">
+                <td className="p-2">{new Date(r.createdAt).toLocaleString()}</td>
+                <td className="p-2 font-mono">
+                  {r.namespace}_{r.toolName}
+                </td>
+                <td className="p-2">{r.status}</td>
+                <td className="p-2">{usdsui(r.amountAtomic)} USDsui</td>
+                <td className="p-2 flex gap-2">
+                  <Link className="underline" href={`/receipts/${r.id}`}>
+                    view
+                  </Link>
+                  {r.txDigest && (
+                    <a
+                      className="underline opacity-70"
+                      href={chain.txExplorerUrl(r.txDigest)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      tx
+                    </a>
+                  )}
+                  {r.receiptBlobId && (
+                    <a
+                      className="underline opacity-70"
+                      href={`${WALRUS_AGG}/v1/blobs/${r.receiptBlobId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      blob
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -8,4 +8,13 @@
 
 export * from './types';
 export { SuiAdapter } from './sui-adapter';
+export { InMemorySuiAdapter } from './in-memory-adapter';
 export { getActiveChain, CHAINS, type ChainRegistry } from './registry';
+export { isSuiAddress, normalizeSuiAddress } from './sui/address';
+export {
+  buildCreateSessionAndDepositTx,
+  buildDepositTx,
+  buildWithdrawTx,
+  type SuiTxConfig,
+  type BuiltTx,
+} from './sui/tx-builder';
