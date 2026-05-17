@@ -28,8 +28,19 @@ export interface SettleSubmitParams {
   sessionObjectId: string;
   serverObjectId: string;
   toolName: string;
+  /**
+   * `exact` scheme: the amount to debit.
+   * `upto` scheme: the quoted ceiling (`quoted_max_atomic`); the actual
+   * debit is `uptoActualAtomic`.
+   */
   amountAtomic: bigint;
-  /** Spending-intent object id. Present → `settle_call_with_intent`. */
+  /**
+   * Upto scheme only. Metered amount actually debited (≤ `amountAtomic`).
+   * Present → routes to `settle_call_upto[_with_intent]`. Absent → the
+   * existing `settle_call[_with_intent]` exact path (unchanged).
+   */
+  uptoActualAtomic?: bigint;
+  /** Spending-intent object id. Present → `*_with_intent` variant. */
   intentId?: string;
   /** Tool category bytes for the intent's category check. '' if none. */
   category?: string;
@@ -42,7 +53,12 @@ export interface SettleSubmitParams {
 export interface SettleSubmitResult {
   txDigest: string;
   receiptObjectId: string;
+  /** Amount actually debited (upto: the metered actual, ≤ quoted max). */
   settledAmountAtomic: bigint;
+  /** Upto scheme only: the quoted ceiling that was authorised. */
+  quotedMaxAtomic?: bigint;
+  /** Upto scheme only: quotedMax − settled (never debited). */
+  unusedAtomic?: bigint;
 }
 
 export class ChainError extends Error {

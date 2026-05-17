@@ -14,6 +14,13 @@ export interface GatewayEnv {
   /** When true, gateway calls facilitator /settle out-of-band (does not block
    *  the tool response on settlement finality). Default false. */
   settleAsync: boolean;
+  /**
+   * Pay-per-output (S7-T04) ceiling. A streaming call's quoted max =
+   * `tool.priceAtomic × streamMaxChunks`. Per-chunk cost defaults to
+   * `tool.priceAtomic` unless the upstream chunk supplies its own
+   * `priceAtomic`. The metered sum (≤ ceiling) is what is debited.
+   * Default 1000. */
+  streamMaxChunks: number;
   supabaseUrl: string | null;
   supabaseServiceRoleKey: string | null;
   redisUrl: string | null;
@@ -34,6 +41,11 @@ export function loadEnv(envIn: NodeJS.ProcessEnv = process.env): GatewayEnv {
     throw new Error(`SUI_NETWORK must be one of ${NETWORKS.join('|')}, got ${network}`);
   }
   const settleAsync = envIn.MCPX_SETTLE_ASYNC === '1';
+  const streamMaxChunks = parseIntOr(
+    'MCPX_STREAM_MAX_CHUNKS',
+    envIn.MCPX_STREAM_MAX_CHUNKS,
+    1000,
+  );
   const attribution = envIn.MCPX_ATTRIBUTION ?? 'Powered by mcpxgg';
 
   if (testMode) {
@@ -44,6 +56,7 @@ export function loadEnv(envIn: NodeJS.ProcessEnv = process.env): GatewayEnv {
       facilitatorUrl: envIn.FACILITATOR_URL ?? 'http://facilitator.test',
       usdsuiTypeTag: envIn.USDSUI_COIN_TYPE ?? '0xtest::usdsui::USDSUI',
       settleAsync,
+      streamMaxChunks,
       supabaseUrl: null,
       supabaseServiceRoleKey: null,
       redisUrl: null,
@@ -62,6 +75,7 @@ export function loadEnv(envIn: NodeJS.ProcessEnv = process.env): GatewayEnv {
     facilitatorUrl: mustEnv(envIn, 'FACILITATOR_URL'),
     usdsuiTypeTag: mustEnv(envIn, 'USDSUI_COIN_TYPE'),
     settleAsync,
+    streamMaxChunks,
     supabaseUrl: mustEnv(envIn, 'SUPABASE_URL'),
     supabaseServiceRoleKey: mustEnv(envIn, 'SUPABASE_SERVICE_ROLE_KEY'),
     redisUrl: envIn.UPSTASH_REDIS_REST_URL ?? null,

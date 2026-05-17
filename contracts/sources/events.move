@@ -94,6 +94,17 @@ public struct RefundIssued has copy, drop {
     timestamp_ms: u64,
 }
 
+/// Emitted by `settlement::settle_call_upto` so indexers can show the quoted
+/// ceiling vs. what was actually metered, and the implicit refund delta the
+/// payer never had to pay.
+public struct UptoFinalized has copy, drop {
+    receipt_id: ID,
+    quoted_max_atomic: u64,
+    actual_atomic: u64,
+    unused_atomic: u64,
+    timestamp_ms: u64,
+}
+
 // ─── Vault events ───────────────────────────────────────────────────────────
 
 public struct VaultCreated has copy, drop {
@@ -344,6 +355,22 @@ public(package) fun emit_refund_issued(
     event::emit(RefundIssued {
         original_receipt_id,
         refund_amount_atomic,
+        timestamp_ms,
+    });
+}
+
+public(package) fun emit_upto_finalized(
+    receipt_id: ID,
+    quoted_max_atomic: u64,
+    actual_atomic: u64,
+    unused_atomic: u64,
+    timestamp_ms: u64,
+) {
+    event::emit(UptoFinalized {
+        receipt_id,
+        quoted_max_atomic,
+        actual_atomic,
+        unused_atomic,
         timestamp_ms,
     });
 }

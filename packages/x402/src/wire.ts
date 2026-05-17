@@ -17,6 +17,8 @@ import type {
   PaymentPayloadWire,
   SettleResult,
   SettleResultWire,
+  UptoSettleExtra,
+  UptoSettleExtraWire,
 } from './types.js';
 import {
   ALL_NETWORKS,
@@ -63,19 +65,68 @@ export function payloadFromWire(w: PaymentPayloadWire): PaymentPayload {
 // ─── SettleResult ⇄ SettleResultWire ──────────────────────────────────────
 
 export function settleResultToWire(r: SettleResult): SettleResultWire {
-  if (r.settledAmountAtomic === undefined) {
-    const { settledAmountAtomic: _omit, ...rest } = r;
-    return rest;
+  const {
+    settledAmountAtomic,
+    quotedMaxAtomic,
+    unusedAtomic,
+    ...rest
+  } = r;
+  const out: SettleResultWire = { ...rest };
+  if (settledAmountAtomic !== undefined) {
+    out.settledAmountAtomic = atomicStringFromBigint(settledAmountAtomic);
   }
-  return { ...r, settledAmountAtomic: atomicStringFromBigint(r.settledAmountAtomic) };
+  if (quotedMaxAtomic !== undefined) {
+    out.quotedMaxAtomic = atomicStringFromBigint(quotedMaxAtomic);
+  }
+  if (unusedAtomic !== undefined) {
+    out.unusedAtomic = atomicStringFromBigint(unusedAtomic);
+  }
+  return out;
 }
 
 export function settleResultFromWire(w: SettleResultWire): SettleResult {
-  if (w.settledAmountAtomic === undefined) {
-    const { settledAmountAtomic: _omit, ...rest } = w;
-    return rest;
+  const {
+    settledAmountAtomic,
+    quotedMaxAtomic,
+    unusedAtomic,
+    ...rest
+  } = w;
+  const out: SettleResult = { ...rest };
+  if (settledAmountAtomic !== undefined) {
+    out.settledAmountAtomic = bigintFromAtomicString(settledAmountAtomic);
   }
-  return { ...w, settledAmountAtomic: bigintFromAtomicString(w.settledAmountAtomic) };
+  if (quotedMaxAtomic !== undefined) {
+    out.quotedMaxAtomic = bigintFromAtomicString(quotedMaxAtomic);
+  }
+  if (unusedAtomic !== undefined) {
+    out.unusedAtomic = bigintFromAtomicString(unusedAtomic);
+  }
+  return out;
+}
+
+// ─── UptoSettleExtra ⇄ UptoSettleExtraWire ────────────────────────────────
+
+export function uptoSettleExtraToWire(e: UptoSettleExtra): UptoSettleExtraWire {
+  return { actualAtomic: atomicStringFromBigint(e.actualAtomic) };
+}
+
+export function uptoSettleExtraFromWire(w: UptoSettleExtraWire): UptoSettleExtra {
+  return { actualAtomic: bigintFromAtomicString(w.actualAtomic) };
+}
+
+/**
+ * Parse the untrusted `uptoExtra` blob on a /settle request body. Returns
+ * undefined when absent (exact-scheme settle). Throws on malformed input —
+ * the facilitator HTTP handler maps the throw to a verify_failed response.
+ */
+export function parseUptoSettleExtra(raw: unknown): UptoSettleExtra | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isObject(raw)) throw new TypeError('uptoExtra is not an object');
+  const { actualAtomic } = raw;
+  if (typeof actualAtomic !== 'string' || !DECIMAL_RE.test(actualAtomic)) {
+    throw new TypeError('uptoExtra.actualAtomic must be a decimal string');
+  }
+  return { actualAtomic: bigintFromAtomicString(actualAtomic) };
 }
 
 // ─── Parse / validate untrusted JSON  ─────────────────────────────────────

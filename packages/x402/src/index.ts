@@ -21,6 +21,8 @@ export {
   type SettleResultWire,
   type SettleErrorCode,
   type SupportedResult,
+  type UptoSettleExtra,
+  type UptoSettleExtraWire,
 } from './types.js';
 
 export {
@@ -34,6 +36,9 @@ export {
   settleResultFromWire,
   parsePaymentPayloadWire,
   parsePaymentDetailsWire,
+  uptoSettleExtraToWire,
+  uptoSettleExtraFromWire,
+  parseUptoSettleExtra,
 } from './wire.js';
 
 export {

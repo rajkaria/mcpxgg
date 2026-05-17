@@ -39,6 +39,10 @@ const E_TOOL_NOT_FOUND: u64 = 2;
 const E_VAULT_OWNER_MISMATCH: u64 = 3;
 const E_AMOUNT_OVERFLOW: u64 = 4;
 const E_INTENT_AGENT_MISMATCH: u64 = 5;
+const E_ACTUAL_EXCEEDS_QUOTED: u64 = 6;
+const E_RECEIPT_SUCCEEDED: u64 = 7;
+const E_ALREADY_REFUNDED: u64 = 8;
+const E_NOT_RECEIPT_PAYER: u64 = 9;
 
 // ─── Receipt ────────────────────────────────────────────────────────────────
 
@@ -132,6 +136,135 @@ public fun settle_call_with_intent<T>(
     );
     intent::record_spend(intent, server_id, amount_atomic, receipt_id, category_bytes, clock);
     receipt_id
+}
+
+/// Pay-per-output (x402 `upto`) settlement. The facilitator quotes a ceiling
+/// `quoted_max_atomic` up front (used for the 402 challenge), but only the
+/// actually-metered `actual_atomic` is debited from the session once the
+/// stream closes. `actual_atomic <= quoted_max_atomic` is enforced; the unused
+/// delta is never debited (the "refund" is implicit — the session keeps it).
+/// `UptoFinalized` records the ceiling, the actual, and the unused delta so
+/// indexers can show "quoted $0.05, paid $0.012".
+public fun settle_call_upto<T>(
+    config: &PlatformConfig,
+    session: &mut Session<T>,
+    server: &Server,
+    vault: &mut DeveloperVault<T>,
+    treasury: &mut PlatformTreasury<T>,
+    insurance: &mut InsurancePool<T>,
+    quoted_max_atomic: u64,
+    actual_atomic: u64,
+    tool_name_bytes: vector<u8>,
+    log_blob_id: vector<u8>,
+    success: bool,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): ID {
+    assert!(actual_atomic <= quoted_max_atomic, E_ACTUAL_EXCEEDS_QUOTED);
+    let receipt_id = settle_inner(
+        config,
+        session,
+        server,
+        vault,
+        treasury,
+        insurance,
+        actual_atomic,
+        tool_name_bytes,
+        log_blob_id,
+        success,
+        clock,
+        ctx,
+    );
+    events::emit_upto_finalized(
+        receipt_id,
+        quoted_max_atomic,
+        actual_atomic,
+        quoted_max_atomic - actual_atomic,
+        clock::timestamp_ms(clock),
+    );
+    receipt_id
+}
+
+/// Intent-aware pay-per-output settlement: identical to `settle_call_upto`
+/// but records the actually-metered spend against the agent's `SpendingIntent`
+/// (per-call cap, daily cap, scope, category all enforced on `actual_atomic`).
+public fun settle_call_upto_with_intent<T>(
+    config: &PlatformConfig,
+    session: &mut Session<T>,
+    server: &Server,
+    vault: &mut DeveloperVault<T>,
+    treasury: &mut PlatformTreasury<T>,
+    insurance: &mut InsurancePool<T>,
+    intent: &mut SpendingIntent,
+    quoted_max_atomic: u64,
+    actual_atomic: u64,
+    tool_name_bytes: vector<u8>,
+    category_bytes: vector<u8>,
+    log_blob_id: vector<u8>,
+    success: bool,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): ID {
+    assert!(actual_atomic <= quoted_max_atomic, E_ACTUAL_EXCEEDS_QUOTED);
+    assert!(intent::agent(intent) == session::owner(session), E_INTENT_AGENT_MISMATCH);
+    let server_id = object::id(server);
+    let receipt_id = settle_inner(
+        config,
+        session,
+        server,
+        vault,
+        treasury,
+        insurance,
+        actual_atomic,
+        tool_name_bytes,
+        log_blob_id,
+        success,
+        clock,
+        ctx,
+    );
+    intent::record_spend(intent, server_id, actual_atomic, receipt_id, category_bytes, clock);
+    events::emit_upto_finalized(
+        receipt_id,
+        quoted_max_atomic,
+        actual_atomic,
+        quoted_max_atomic - actual_atomic,
+        clock::timestamp_ms(clock),
+    );
+    receipt_id
+}
+
+/// Permissionless insurance claim for a failed call. The payer holds the
+/// soulbound `CallReceipt`; if it recorded `success == false` and has not yet
+/// been refunded, they can reclaim the call cost from the `InsurancePool`,
+/// capped at the pool balance. Sets `refunded = true` so a receipt can only be
+/// claimed once. No cap/oracle needed — the soulbound receipt *is* the proof.
+public fun claim_for_failed_call<T>(
+    receipt: &mut CallReceipt,
+    pool: &mut InsurancePool<T>,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): u64 {
+    assert!(ctx.sender() == receipt.payer, E_NOT_RECEIPT_PAYER);
+    assert!(!receipt.success, E_RECEIPT_SUCCEEDED);
+    assert!(!receipt.refunded, E_ALREADY_REFUNDED);
+
+    let pool_balance = insurance::balance_value(pool);
+    let payout = if (receipt.amount_atomic <= pool_balance) {
+        receipt.amount_atomic
+    } else {
+        pool_balance
+    };
+
+    receipt.refunded = true;
+    if (payout > 0) {
+        insurance::pay_claim(pool, payout, receipt.payer, ctx);
+    };
+    events::emit_refund_issued(
+        object::uid_to_inner(&receipt.id),
+        payout,
+        clock::timestamp_ms(clock),
+    );
+    payout
 }
 
 fun settle_inner<T>(

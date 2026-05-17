@@ -12,8 +12,15 @@ export interface PreflightInput {
   auth: AuthContext;
   server: ResolvedServer;
   tool: ResolvedTool;
-  /** Amount that will actually be settled (0 if free-tier). */
+  /** Amount that will actually be settled (0 if free-tier). For a streaming
+   *  (pay-per-output) call this is the quoted *ceiling* the buyer must be
+   *  able to afford, not the list price. */
   chargeAtomic: bigint;
+  /** Pay-per-output streaming (S7-T04): per-chunk price is the list price
+   *  and `chargeAtomic` is `listPrice × maxChunks`, so the "charge ≤ list
+   *  price" defensive check does not apply. Caps/balance still gate the
+   *  ceiling. */
+  isStream?: boolean;
   nowMs: number;
 }
 
@@ -21,6 +28,7 @@ const DAY_MS = 86_400_000;
 
 export function preflight(input: PreflightInput): void {
   const { auth, server, tool, chargeAtomic, nowMs } = input;
+  const isStream = input.isStream === true;
 
   if (!auth.active) {
     throw new GatewayError('Session is inactive', 'session_inactive');
@@ -45,8 +53,10 @@ export function preflight(input: PreflightInput): void {
 
   if (chargeAtomic === 0n) return; // free-tier call — caps/balance not relevant
 
-  if (chargeAtomic > tool.priceAtomic) {
-    // Defensive: charge should never exceed list price.
+  if (!isStream && chargeAtomic > tool.priceAtomic) {
+    // Defensive: for a unary call the charge is the list price exactly. For
+    // a streaming call `chargeAtomic` is the ceiling (listPrice × maxChunks)
+    // and legitimately exceeds the per-chunk list price — skip this guard.
     throw new GatewayError('charge exceeds tool price', 'server_error');
   }
   if (auth.perCallCapAtomic > 0n && chargeAtomic > auth.perCallCapAtomic) {

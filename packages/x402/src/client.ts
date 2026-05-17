@@ -11,6 +11,7 @@ import type {
   PaymentPayload,
   SettleResult,
   SupportedResult,
+  UptoSettleExtra,
   VerifyResult,
 } from './types.js';
 import {
@@ -19,6 +20,7 @@ import {
   payloadFromWire,
   payloadToWire,
   settleResultFromWire,
+  uptoSettleExtraToWire,
 } from './wire.js';
 
 export interface FacilitatorClientOptions {
@@ -54,10 +56,23 @@ export class FacilitatorClient {
     return res as VerifyResult;
   }
 
-  async settle(payload: PaymentPayload, details: PaymentDetails): Promise<SettleResult> {
+  /**
+   * Settle a payment. For the `upto` scheme pass `uptoExtra` with the metered
+   * actual amount to debit (≤ the signed `details.amountAtomic` ceiling); the
+   * contract never moves the unused delta (implicit refund). For `exact`,
+   * omit it.
+   */
+  async settle(
+    payload: PaymentPayload,
+    details: PaymentDetails,
+    uptoExtra?: UptoSettleExtra,
+  ): Promise<SettleResult> {
     const body = {
       payload: payloadToWire(payload),
       details: detailsToWire(details),
+      ...(uptoExtra !== undefined && {
+        uptoExtra: uptoSettleExtraToWire(uptoExtra),
+      }),
     };
     const res = (await this.req('POST', '/settle', body)) as unknown as Parameters<typeof settleResultFromWire>[0];
     return settleResultFromWire(res);

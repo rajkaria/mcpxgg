@@ -220,3 +220,157 @@ export async function runQualityOracle(
     failures,
   };
 }
+
+// ─── S7-T09: SLA staking auto-slash orchestration ────────────────────────
+
+import {
+  evaluateSla,
+  nextBreachStreak,
+  slashAmountAtomic,
+  slashReason,
+  type StakedServer,
+} from './sla.js';
+
+export type { StakedServer } from './sla.js';
+
+/** Read-only view of the indexer `stakes`/`stake_slashes` mirror. */
+export interface StakeStore {
+  /**
+   * All currently-active (un-fully-slashed) staked servers with the stake
+   * amount net of prior slashes. The store derives `remainingStakeAtomic`
+   * from `stakes.amount_atomic` minus the sum of `stake_slashes.amount_atomic`
+   * for that stake.
+   */
+  listActiveStakes(): Promise<StakedServer[]>;
+}
+
+/**
+ * Durable per-stake breach streak. The oracle is the only writer; the streak
+ * is keyed by stakeObjectId and must survive process restarts so the ≥2
+ * consecutive-window rule holds across the 6h cadence.
+ */
+export interface BreachStreakStore {
+  /** Consecutive in-breach windows recorded so far (0 if unseen). */
+  getStreak(stakeObjectId: string): Promise<number>;
+  /** Persist the new streak (0 clears it). */
+  setStreak(stakeObjectId: string, consecutiveBreaches: number): Promise<void>;
+}
+
+export interface SlashInput {
+  stakeObjectId: string;
+  serverObjectId: string;
+  amountAtomic: bigint;
+  reason: string;
+}
+
+/**
+ * Submits one on-chain slash. The production impl builds the PTB via
+ * `@mcpxgg/chain` `buildSlashStakeTx` (oracle holds the OracleCap) and signs
+ * it through `signAndExecuteBase64Tx` — the exact same signer/cap path the
+ * quality attestation uses. Injected so tests assert without a node.
+ */
+export interface SlashChainClient {
+  slash(input: SlashInput): Promise<{ digest: string }>;
+}
+
+export interface SlaSlashResult {
+  windowStartMs: number;
+  windowEndMs: number;
+  stakesEvaluated: number;
+  inBreach: number;
+  slashesSubmitted: number;
+  slashedAtomicTotal: bigint;
+  failures: { stakeObjectId: string; error: string }[];
+}
+
+/**
+ * One SLA-slashing pass over the same closed window the quality oracle
+ * measured. For each active stake: measure its window uptime from the call
+ * samples, evaluate against its committed SLA, advance its persisted breach
+ * streak, and — when the streak crosses ≥2 consecutive in-breach windows —
+ * build+sign a proportional slash. Pure-ish: all effects via injected deps.
+ *
+ * A per-stake failure (mirror gap, tx revert) is collected and does not block
+ * the rest; the streak is only advanced *after* a successful slash submission
+ * for the slashing case so a failed slash is retried next window rather than
+ * silently dropped.
+ */
+export async function runSlaSlashing(
+  stakeStore: StakeStore,
+  streakStore: BreachStreakStore,
+  chain: SlashChainClient,
+  samples: readonly CallSample[],
+  windowStartMs: number,
+  windowEndMs: number,
+): Promise<SlaSlashResult> {
+  const stakes = await stakeStore.listActiveStakes();
+  // Reuse the same pure quality fold for per-server uptime/sample-count.
+  const quality = computeAllServerQuality(samples);
+  const qByServer = new Map(quality.map((q) => [q.serverObjectId, q]));
+
+  const failures: { stakeObjectId: string; error: string }[] = [];
+  let inBreach = 0;
+  let slashesSubmitted = 0;
+  let slashedTotal = 0n;
+
+  for (const stake of stakes) {
+    try {
+      const q = qByServer.get(stake.serverObjectId);
+      const windowUptimeX100 = q?.uptimeX100 ?? 0;
+      const windowSampleCount = q?.sampleCount ?? 0;
+      const evaluation = evaluateSla(stake, windowUptimeX100, windowSampleCount);
+      if (evaluation.inBreach) inBreach += 1;
+
+      const prev = await streakStore.getStreak(stake.stakeObjectId);
+      const { consecutiveBreaches, shouldSlash } = nextBreachStreak(
+        prev,
+        evaluation,
+      );
+
+      if (!shouldSlash) {
+        // No-signal windows leave the streak (and store) unchanged.
+        if (consecutiveBreaches !== prev) {
+          await streakStore.setStreak(
+            stake.stakeObjectId,
+            consecutiveBreaches,
+          );
+        }
+        continue;
+      }
+
+      const amount = slashAmountAtomic(
+        evaluation,
+        stake.remainingStakeAtomic,
+      );
+      if (amount <= 0n) {
+        // Breached but nothing left to slash — keep the streak, no tx.
+        await streakStore.setStreak(stake.stakeObjectId, consecutiveBreaches);
+        continue;
+      }
+
+      await chain.slash({
+        stakeObjectId: stake.stakeObjectId,
+        serverObjectId: stake.serverObjectId,
+        amountAtomic: amount,
+        reason: slashReason(evaluation, consecutiveBreaches, windowEndMs),
+      });
+      // Slash landed — persist the streak so a repeat-offender keeps
+      // accumulating and reset only happens on a genuinely compliant window.
+      await streakStore.setStreak(stake.stakeObjectId, consecutiveBreaches);
+      slashesSubmitted += 1;
+      slashedTotal += amount;
+    } catch (e) {
+      failures.push({ stakeObjectId: stake.stakeObjectId, error: String(e) });
+    }
+  }
+
+  return {
+    windowStartMs,
+    windowEndMs,
+    stakesEvaluated: stakes.length,
+    inBreach,
+    slashesSubmitted,
+    slashedAtomicTotal: slashedTotal,
+    failures,
+  };
+}

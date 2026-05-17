@@ -20,6 +20,7 @@ interface Server {
   created_at: string;
   quality_score_x100?: number | null;
   featured?: boolean;
+  staked?: boolean;
 }
 
 interface MarketplaceClientProps {
@@ -28,6 +29,7 @@ interface MarketplaceClientProps {
   initialQuery: string;
   initialCategory: string;
   initialSort: string;
+  initialStakedOnly?: boolean;
 }
 
 export function MarketplaceClient({
@@ -36,18 +38,21 @@ export function MarketplaceClient({
   initialQuery,
   initialCategory,
   initialSort,
+  initialStakedOnly = false,
 }: MarketplaceClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState(initialQuery);
   const [category, setCategory] = useState(initialCategory);
   const [sort, setSort] = useState(initialSort);
+  const [stakedOnly, setStakedOnly] = useState(initialStakedOnly);
 
   const updateSearch = useCallback(
-    (q: string, cat: string, s: string) => {
+    (q: string, cat: string, s: string, staked: boolean) => {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (cat && cat !== "All") params.set("category", cat);
       if (s && s !== "popular") params.set("sort", s);
+      if (staked) params.set("staked", "1");
       router.push(`/marketplace?${params.toString()}`);
     },
     [router]
@@ -55,17 +60,23 @@ export function MarketplaceClient({
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSearch(search, category, sort);
+    updateSearch(search, category, sort, stakedOnly);
   };
 
   const handleCategoryClick = (cat: string) => {
     setCategory(cat);
-    updateSearch(search, cat, sort);
+    updateSearch(search, cat, sort, stakedOnly);
   };
 
   const handleSortChange = (newSort: string) => {
     setSort(newSort);
-    updateSearch(search, category, newSort);
+    updateSearch(search, category, newSort, stakedOnly);
+  };
+
+  const handleStakedToggle = () => {
+    const next = !stakedOnly;
+    setStakedOnly(next);
+    updateSearch(search, category, sort, next);
   };
 
   return (
@@ -105,6 +116,19 @@ export function MarketplaceClient({
           </div>
         </form>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleStakedToggle}
+            aria-pressed={stakedOnly}
+            className="px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 border"
+            style={{
+              background: stakedOnly ? "var(--primary)" : "transparent",
+              color: stakedOnly ? "#fff" : "var(--text-secondary)",
+              borderColor: stakedOnly ? "var(--primary)" : "var(--border)",
+            }}
+          >
+            🔒 Staked
+          </button>
           {(["popular", "newest", "rating"] as const).map((s) => (
             <button
               key={s}
@@ -206,6 +230,18 @@ export function MarketplaceClient({
                           }}
                         >
                           Featured
+                        </span>
+                      )}
+                      {server.staked && (
+                        <span
+                          title="Developer-staked SLA collateral"
+                          className="px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0"
+                          style={{
+                            background: "var(--primary-glow)",
+                            color: "var(--primary)",
+                          }}
+                        >
+                          🔒 Staked
                         </span>
                       )}
                     </div>

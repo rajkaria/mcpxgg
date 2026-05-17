@@ -523,19 +523,19 @@ mainnet keystore, see `docs/BLOCKED.md` item 11.
 | ID | Task | Component | Effort | Status |
 |---|---|---|---|---|
 | **A2 — Pay-per-output streaming** | | | | |
-| S7-T01 | x402 `upto` scheme types in `packages/x402` | packages/x402 | S | ☐ |
-| S7-T02 | Facilitator `/settle` upto-mode: settles up to a quoted max; refunds delta on completion | apps/facilitator | L | ☐ |
+| S7-T01 | x402 `upto` scheme types in `packages/x402` | packages/x402 | S | Done |
+| S7-T02 | Facilitator `/settle` upto-mode: settles up to a quoted max; refunds delta on completion | apps/facilitator | L | Done |
 | S7-T03 | Move: `settlement::settle_call_upto` variant that accepts max amount + actual usage post-completion | contracts | M | ☐ |
-| S7-T04 | Gateway: streaming detection (`Accept: text/event-stream`), per-chunk metering, finalize on stream close | apps/gateway | XL | ☐ |
-| S7-T05 | `@mcpxgg/server` SDK: `tool.handler` can return an async iterator → SDK metering wraps each chunk | packages/sdk-server | L | ☐ |
-| S7-T06 | E2E test: streaming server call returns 5 chunks, settles for chunk count not max | tests | M | ☐ |
+| S7-T04 | Gateway: streaming detection (`Accept: text/event-stream`), per-chunk metering, finalize on stream close | apps/gateway | XL | Done |
+| S7-T05 | `@mcpxgg/server` SDK: `tool.handler` can return an async iterator → SDK metering wraps each chunk | packages/sdk-server | L | Done |
+| S7-T06 | E2E test: streaming server call returns 5 chunks, settles for chunk count not max | tests | M | Done |
 | **A3 — SLA Staking + Auto-Slash** | | | | |
 | S7-T07 | `mcpx::staking::ServerStake` Move: developer locks USDsui as collateral, sla_tier (95/99/99.9), expiry | contracts | M | ☐ |
 | S7-T08 | `mcpx::staking::slash` callable by quality oracle multisig: slashes stake proportionally to SLA breach magnitude, transfers slashed USDsui to InsurancePool | contracts | M | ☐ |
-| S7-T09 | Quality oracle service computes hourly SLA compliance per staked server; triggers slashing when threshold breached for ≥2 windows | apps/quality-oracle | L | ☐ |
-| S7-T10 | `<StakingFlow />` UI in dev dashboard: lock stake, choose SLA tier, view slashed history | apps/web | M | ☐ |
-| S7-T11 | Server detail page shows "🔒 $X staked at 99% SLA" badge | apps/web | S | ☐ |
-| S7-T12 | Marketplace filter: "Servers with stake" toggle | apps/web | S | ☐ |
+| S7-T09 | Quality oracle service computes hourly SLA compliance per staked server; triggers slashing when threshold breached for ≥2 windows | apps/quality-oracle | L | ✓ |
+| S7-T10 | `<StakingFlow />` UI in dev dashboard: lock stake, choose SLA tier, view slashed history | apps/web | M | ✓ |
+| S7-T11 | Server detail page shows "🔒 $X staked at 99% SLA" badge | apps/web | S | ✓ |
+| S7-T12 | Marketplace filter: "Servers with stake" toggle | apps/web | S | ✓ |
 | S7-T13 | E2E test: stake server → simulate downtime via test harness → verify slashing tx | tests | M | ☐ |
 | **A4 — Insurance Pool** | | | | |
 | S7-T14 | `mcpx::insurance::claim_for_failed_call` Move: anyone can submit a CallReceipt with `success: false` to claim back the call cost from InsurancePool, capped at pool balance | contracts | M | ☐ |

@@ -25,6 +25,7 @@ import { executeTool } from './executor.js';
 import { archiveCall } from './walrus-archive.js';
 import { buildReceiptMeta } from './meta.js';
 import { GatewayError, makeToolErrorContent } from './errors.js';
+import { streamUpstream, StreamMeter } from './stream.js';
 
 export interface GatewayDeps {
   env: GatewayEnv;
@@ -318,6 +319,219 @@ async function handleToolsCall(
     content: exec.content,
     isError: exec.isError,
     _meta: { ...(exec._meta ?? {}), receipt },
+  });
+}
+
+/**
+ * Pay-per-output streaming entrypoint (S7-T04). Returns an SSE `Response`.
+ *
+ * Flow: resolve → preflight → intent → open upstream SSE → for each chunk:
+ * meter + forward to client → on close (done OR client abort) finalize via
+ * the facilitator `upto` path with the summed metered actual and the quoted
+ * ceiling. Server error before any chunk → no settlement (mirrors the
+ * non-stream path). A settle failure after work was done is logged and
+ * surfaced as a terminal `settlement: pending` SSE event.
+ */
+export async function handleStreamingToolsCall(
+  params: Record<string, unknown>,
+  auth: AuthContext,
+  deps: GatewayDeps,
+  meta: RequestMeta,
+  clientSignal: AbortSignal,
+): Promise<Response> {
+  const now = deps.now ?? Date.now;
+  const fullName = params.name as string | undefined;
+  const args = (params.arguments as Record<string, unknown>) ?? {};
+
+  const sseError = (code: string, message: string): Response =>
+    sse([
+      { event: 'error', data: JSON.stringify({ code, message }) },
+    ]);
+
+  if (!fullName) return sseError('bad_request', 'Missing params.name');
+  const requestId = crypto.randomUUID();
+  const { namespace, toolName } = parseToolName(fullName);
+
+  const server = await deps.store.resolveServer(namespace);
+  if (!server) return sseError('server_not_found', 'server not found');
+  const tool = await deps.store.resolveTool(server.serverObjectId, toolName);
+  if (!tool) return sseError('tool_not_found', 'tool not found');
+
+  // Streaming is never free-tier — pay-per-output is metered settlement.
+  const perChunkAtomic = tool.priceAtomic;
+  const quotedMaxAtomic = perChunkAtomic * BigInt(deps.env.streamMaxChunks);
+
+  try {
+    preflight({
+      auth,
+      server,
+      tool,
+      chargeAtomic: quotedMaxAtomic,
+      isStream: true,
+      nowMs: now(),
+    });
+  } catch (e) {
+    if (e instanceof GatewayError) {
+      return sseError(e.code, e.message);
+    }
+    throw e;
+  }
+
+  const intentCategory = meta.category ?? '';
+  if (meta.intentId !== undefined) {
+    try {
+      await validateIntent(deps.store, {
+        intentObjectId: meta.intentId,
+        category: intentCategory,
+        callerAddress: auth.ownerAddress,
+        serverObjectId: server.serverObjectId,
+        chargeAtomic: quotedMaxAtomic,
+        nowMs: now(),
+      });
+    } catch (e) {
+      if (e instanceof GatewayError) return sseError(e.code, e.message);
+      throw e;
+    }
+  }
+  const intentSettle =
+    meta.intentId !== undefined
+      ? { intentId: meta.intentId, category: intentCategory }
+      : {};
+
+  const meter = new StreamMeter(quotedMaxAtomic, perChunkAtomic);
+  const collected: Array<{ type: string; text: string }> = [];
+  const encoder = new TextEncoder();
+
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+        );
+
+      let sawChunk = false;
+      let streamErr: GatewayError | undefined;
+      try {
+        for await (const chunk of streamUpstream(
+          server,
+          tool,
+          args,
+          { requestId, payerAddress: auth.ownerAddress },
+          clientSignal,
+          deps.fetchImpl,
+        )) {
+          sawChunk = true;
+          const within = meter.record(chunk);
+          collected.push({ type: 'text', text: chunk.text });
+          send('chunk', {
+            text: chunk.text,
+            metered_atomic: meter.meteredAtomic.toString(),
+            ...(chunk.meta ? { meta: chunk.meta } : {}),
+          });
+          if (!within || clientSignal.aborted) break;
+        }
+      } catch (e) {
+        if (e instanceof GatewayError) streamErr = e;
+        else streamErr = new GatewayError(String(e), 'server_error');
+      }
+
+      // No chunk and an upstream error → no settlement, no charge.
+      if (!sawChunk && streamErr) {
+        send('error', { code: streamErr.code, message: streamErr.message });
+        controller.close();
+        return;
+      }
+
+      // Finalize: archive + settle the metered actual against the quoted max.
+      const blobId = await archiveCall(deps.walrus, {
+        v: 1,
+        namespace,
+        toolName,
+        userId: auth.userId,
+        requestId,
+        ts: now(),
+        request: { arguments: args },
+        response: { content: collected, isError: streamErr !== undefined },
+        stream: { chunks: meter.chunkCount, metered_atomic: meter.meteredAtomic.toString() },
+      });
+
+      let settlement: 'settled' | 'pending' = 'pending';
+      let txDigest: string | undefined;
+      let receiptObjectId: string | undefined;
+      const outcome = await settle(deps.env, deps.facilitator, deps.signer, {
+        auth,
+        server,
+        tool,
+        scheme: 'upto',
+        chargeAtomic: quotedMaxAtomic,
+        uptoActualAtomic: meter.meteredAtomic,
+        success: streamErr === undefined,
+        ...(blobId ? { receiptBlobId: blobId } : {}),
+        ...intentSettle,
+        nowMs: now(),
+      });
+      if (outcome.settled && outcome.result) {
+        settlement = 'settled';
+        txDigest = outcome.result.txDigest;
+        receiptObjectId = outcome.result.receiptObjectId;
+      } else {
+        deps.logger.error(
+          { requestId, tool: fullName, error: outcome.error },
+          'gateway: stream settlement failed after work done',
+        );
+      }
+
+      const receipt = buildReceiptMeta({
+        env: deps.env,
+        namespace,
+        toolName,
+        chargeAtomic: meter.meteredAtomic,
+        blobId,
+        settlement,
+        ...(txDigest ? { txDigest } : {}),
+        ...(receiptObjectId ? { receiptObjectId } : {}),
+      });
+
+      deps.logger.info(
+        {
+          requestId,
+          userId: auth.userId,
+          tool: fullName,
+          chunks: meter.chunkCount,
+          meteredAtomic: meter.meteredAtomic.toString(),
+          quotedMaxAtomic: quotedMaxAtomic.toString(),
+          settlement,
+          aborted: clientSignal.aborted,
+        },
+        'gateway: stream complete',
+      );
+
+      send('done', {
+        chunks: meter.chunkCount,
+        metered_atomic: meter.meteredAtomic.toString(),
+        quoted_max_atomic: quotedMaxAtomic.toString(),
+        settlement,
+        receipt,
+        ...(streamErr ? { upstream_error: streamErr.message } : {}),
+      });
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+      'x-mcpx-stream': '1',
+    },
+  });
+}
+
+function sse(events: Array<{ event: string; data: string }>): Response {
+  const text = events.map((e) => `event: ${e.event}\ndata: ${e.data}\n\n`).join('');
+  return new Response(text, {
+    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
   });
 }
 

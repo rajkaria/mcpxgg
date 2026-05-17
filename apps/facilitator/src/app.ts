@@ -5,7 +5,7 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { X402_VERSION, settleResultToWire } from '@mcpxgg/x402';
+import { X402_VERSION, parseUptoSettleExtra, settleResultToWire } from '@mcpxgg/x402';
 import type { SuiBackend } from './sui/backend.js';
 import type { FacilitatorEnv } from './env.js';
 import { GasStation } from './gas-station.js';
@@ -101,12 +101,26 @@ export function createApp(deps: AppDeps): Hono {
         400,
       );
     }
+    let uptoExtra;
+    try {
+      uptoExtra = parseUptoSettleExtra(body.uptoExtra);
+    } catch (e) {
+      return c.json(
+        {
+          success: false,
+          errorCode: 'verify_failed',
+          errorMessage: `malformed uptoExtra: ${(e as Error).message}`,
+        },
+        400,
+      );
+    }
     const result = await settlePayment(
       {
         payload: body.payload,
         details: body.details,
         ...(typeof body.receiptBlobId === 'string' && { receiptBlobId: body.receiptBlobId }),
         ...(typeof body.success === 'boolean' && { success: body.success }),
+        ...(uptoExtra !== undefined && { uptoExtra }),
       },
       deps.backend,
       deps.env,

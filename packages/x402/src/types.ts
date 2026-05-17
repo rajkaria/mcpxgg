@@ -107,6 +107,39 @@ export interface SettleResult {
   errorCode?: SettleErrorCode;
   /** Human-readable supplement to `errorCode`. */
   errorMessage?: string;
+  /**
+   * Upto-scheme only. The quoted ceiling the buyer signed for. Present iff
+   * the call settled via the `upto` scheme. `settledAmountAtomic` is what was
+   * actually debited (≤ this); `unusedAtomic = quotedMaxAtomic - settled`.
+   */
+  quotedMaxAtomic?: bigint;
+  /** Upto-scheme only. quotedMax − settled — never debited (implicit refund). */
+  unusedAtomic?: bigint;
+}
+
+// ─── Upto scheme — settle-time actual amount ──────────────────────────────
+
+/**
+ * The `upto` scheme settle-time supplement.
+ *
+ * In `exact` mode the buyer signs the exact `amountAtomic` and that is what
+ * is debited. In `upto` mode the buyer signs a *ceiling* (`amountAtomic` on
+ * the signed `PaymentDetails` is the quoted max) and the gateway, after
+ * metering the streamed work, tells the facilitator the `actualAtomic` to
+ * debit. The contract debits only `actual` (≤ quoted max); the unused delta
+ * is never moved (implicit refund — no second tx).
+ *
+ * `actualAtomic` is NOT part of the signed message: the buyer authorises
+ * "up to N"; the metered usage is discovered after signing. The facilitator
+ * enforces `0 ≤ actual ≤ quotedMax` on chain via `settle_call_upto`.
+ */
+export interface UptoSettleExtra {
+  /** Metered amount to actually debit. Must be ≤ signed `amountAtomic`. */
+  actualAtomic: bigint;
+}
+
+export interface UptoSettleExtraWire {
+  actualAtomic: string;
 }
 
 export type SettleErrorCode =
@@ -146,6 +179,11 @@ export interface PaymentPayloadWire
 }
 
 export interface SettleResultWire
-  extends Omit<SettleResult, 'settledAmountAtomic'> {
+  extends Omit<
+    SettleResult,
+    'settledAmountAtomic' | 'quotedMaxAtomic' | 'unusedAtomic'
+  > {
   settledAmountAtomic?: string;
+  quotedMaxAtomic?: string;
+  unusedAtomic?: string;
 }

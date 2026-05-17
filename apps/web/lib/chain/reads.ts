@@ -305,6 +305,165 @@ export async function listIntentsForUser(
   });
 }
 
+// ─── S7-T10/T11/T12: SLA staking (read the `stakes`/`stake_slashes` mirror) ─
+
+export interface StakeSlashRow {
+  amountAtomic: bigint;
+  reason: string;
+  slashedAt: string;
+  txDigest: string | null;
+}
+
+export interface ServerStakeRow {
+  stakeObjectId: string;
+  serverObjectId: string;
+  ownerAddress: string;
+  /** Original posted stake. */
+  amountAtomic: bigint;
+  /** amountAtomic minus the sum of all slashes. */
+  remainingAtomic: bigint;
+  /** Committed SLA uptime ×100 (9500 | 9900 | 9990). */
+  slaUptimeX100: number;
+  txDigest: string | null;
+  createdAt: string;
+  slashes: StakeSlashRow[];
+}
+
+function slaTierLabel(slaUptimeX100: number): string {
+  if (slaUptimeX100 >= 9990) return "99.9";
+  if (slaUptimeX100 >= 9900) return "99";
+  return "95";
+}
+
+export function slaTierFromX100(slaUptimeX100: number): string {
+  return slaTierLabel(slaUptimeX100);
+}
+
+async function loadStakeSlashes(
+  stakeObjectIds: string[],
+): Promise<Record<string, StakeSlashRow[]>> {
+  if (stakeObjectIds.length === 0) return {};
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("stake_slashes")
+    .select("stake_object_id, amount_atomic, reason, slashed_at, tx_digest")
+    .in("stake_object_id", stakeObjectIds)
+    .order("slashed_at", { ascending: false })) as {
+    data: Array<Record<string, unknown>> | null;
+  };
+  const out: Record<string, StakeSlashRow[]> = {};
+  for (const r of data ?? []) {
+    const id = String(r.stake_object_id);
+    (out[id] ??= []).push({
+      amountAtomic: toBig(r.amount_atomic as string),
+      reason: String(r.reason ?? ""),
+      slashedAt: String(r.slashed_at ?? ""),
+      txDigest: (r.tx_digest as string) ?? null,
+    });
+  }
+  return out;
+}
+
+function mapStake(
+  d: Record<string, unknown>,
+  slashes: StakeSlashRow[],
+): ServerStakeRow {
+  const amount = toBig(d.amount_atomic as string);
+  const slashedTotal = slashes.reduce((a, s) => a + s.amountAtomic, 0n);
+  const remaining = amount - slashedTotal;
+  return {
+    stakeObjectId: String(d.stake_object_id),
+    serverObjectId: String(d.server_object_id),
+    ownerAddress: String(d.owner_address ?? ""),
+    amountAtomic: amount,
+    remainingAtomic: remaining > 0n ? remaining : 0n,
+    slaUptimeX100: Number(d.sla_uptime_x100 ?? 0),
+    txDigest: (d.tx_digest as string) ?? null,
+    createdAt: String(d.created_at ?? ""),
+    slashes,
+  };
+}
+
+/** All stakes posted by a developer (their dashboard view). */
+export async function listStakesForUser(
+  ownerAddress: string,
+): Promise<ServerStakeRow[]> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("stakes")
+    .select(
+      "stake_object_id, server_object_id, owner_address, amount_atomic, sla_uptime_x100, tx_digest, created_at",
+    )
+    .eq("owner_address", ownerAddress)
+    .order("created_at", { ascending: false })) as {
+    data: Array<Record<string, unknown>> | null;
+  };
+  const rows = data ?? [];
+  const byStake = await loadStakeSlashes(
+    rows.map((r) => String(r.stake_object_id)),
+  );
+  return rows.map((r) =>
+    mapStake(r, byStake[String(r.stake_object_id)] ?? []),
+  );
+}
+
+/** Active (non-zero remaining) stake for a server, if any — for the badge. */
+export async function getServerStake(
+  serverObjectId: string,
+): Promise<ServerStakeRow | null> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("stakes")
+    .select(
+      "stake_object_id, server_object_id, owner_address, amount_atomic, sla_uptime_x100, tx_digest, created_at",
+    )
+    .eq("server_object_id", serverObjectId)
+    .order("created_at", { ascending: false })) as {
+    data: Array<Record<string, unknown>> | null;
+  };
+  const rows = data ?? [];
+  if (rows.length === 0) return null;
+  const byStake = await loadStakeSlashes(
+    rows.map((r) => String(r.stake_object_id)),
+  );
+  const mapped = rows.map((r) =>
+    mapStake(r, byStake[String(r.stake_object_id)] ?? []),
+  );
+  // Highest committed SLA among still-funded stakes; else the latest stake.
+  const funded = mapped.filter((m) => m.remainingAtomic > 0n);
+  if (funded.length === 0) return mapped[0] ?? null;
+  return funded.sort(
+    (a, b) =>
+      b.slaUptimeX100 - a.slaUptimeX100 ||
+      (b.remainingAtomic > a.remainingAtomic ? 1 : -1),
+  )[0]!;
+}
+
+/** Set of serverObjectIds that currently have a funded stake (T12 filter). */
+export async function listStakedServerIds(): Promise<Set<string>> {
+  const sb = createAdminClient();
+  const { data } = (await sb
+    .from("stakes")
+    .select("stake_object_id, server_object_id, amount_atomic")) as {
+    data: Array<Record<string, unknown>> | null;
+  };
+  const rows = data ?? [];
+  if (rows.length === 0) return new Set();
+  const byStake = await loadStakeSlashes(
+    rows.map((r) => String(r.stake_object_id)),
+  );
+  const ids = new Set<string>();
+  for (const r of rows) {
+    const amount = toBig(r.amount_atomic as string);
+    const slashed = (byStake[String(r.stake_object_id)] ?? []).reduce(
+      (a, s) => a + s.amountAtomic,
+      0n,
+    );
+    if (amount - slashed > 0n) ids.add(String(r.server_object_id));
+  }
+  return ids;
+}
+
 // ─── S6-T19: latest quality attestation per server ───────────────────────
 
 export interface QualityScore {

@@ -12,6 +12,10 @@ export interface OracleEnv {
   oracleCapId: string;
   /** suiprivkey1... or 0x-hex ed25519 secret for the oracle address. */
   oraclePrivateKey: string;
+  /** USDsui coin type tag — `staking::slash<T>` type arg (S7-T09). */
+  usdsuiCoinType: string;
+  /** Shared InsurancePool object id slashed stake routes to (S7-T09). */
+  insurancePoolId: string;
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
   /** Loop cadence check interval in ms (the *window* is always 6h). */
@@ -41,6 +45,8 @@ export function loadEnv(envIn: NodeJS.ProcessEnv = process.env): OracleEnv {
       mcpxPackageId: envIn.MCPX_PACKAGE_ID ?? '0xtest',
       oracleCapId: envIn.MCPX_ORACLE_CAP_ID ?? '0xcap',
       oraclePrivateKey: envIn.MCPX_ORACLE_PRIVATE_KEY ?? '0x00',
+      usdsuiCoinType: envIn.USDSUI_COIN_TYPE ?? '0xtest::usdsui::USDSUI',
+      insurancePoolId: envIn.MCPX_INSURANCE_POOL_ID ?? '0xpool',
       supabaseUrl: envIn.SUPABASE_URL ?? 'http://test',
       supabaseServiceRoleKey: envIn.SUPABASE_SERVICE_ROLE_KEY ?? 'test',
       pollIntervalMs,
@@ -55,6 +61,8 @@ export function loadEnv(envIn: NodeJS.ProcessEnv = process.env): OracleEnv {
     mcpxPackageId: mustEnv(envIn, 'MCPX_PACKAGE_ID'),
     oracleCapId: mustEnv(envIn, 'MCPX_ORACLE_CAP_ID'),
     oraclePrivateKey: mustEnv(envIn, 'MCPX_ORACLE_PRIVATE_KEY'),
+    usdsuiCoinType: mustEnv(envIn, 'USDSUI_COIN_TYPE'),
+    insurancePoolId: mustEnv(envIn, 'MCPX_INSURANCE_POOL_ID'),
     supabaseUrl: mustEnv(envIn, 'SUPABASE_URL'),
     supabaseServiceRoleKey: mustEnv(envIn, 'SUPABASE_SERVICE_ROLE_KEY'),
     pollIntervalMs,

@@ -427,3 +427,203 @@ export async function buildAddToolsTx(args: {
   const txBytes = await tx.build({ client });
   return { txBytesB64: Buffer.from(txBytes).toString('base64') };
 }
+
+/**
+ * S7 — SLA staking + insurance claim/top-up builders.
+ *
+ * Move entry points:
+ *   mcpx::staking::post<T>(config, server_id: ID, deposit: Coin<T>,
+ *       sla_uptime_x100: u32, sla_window_seconds: u64,
+ *       lock_duration_ms: u64, clock, ctx) -> ID
+ *   mcpx::staking::top_up<T>(stake: &mut ServerStake<T>, deposit: Coin<T>, ctx)
+ *   mcpx::staking::withdraw<T>(stake: &mut ServerStake<T>, amount: u64,
+ *       clock, ctx)
+ *   mcpx::staking::slash<T>(&OracleCap, stake: &mut ServerStake<T>,
+ *       pool: &mut InsurancePool<T>, amount: u64, reason: vector<u8>, clock)
+ *   mcpx::insurance::top_up<T>(pool: &mut InsurancePool<T>, contribution: Coin<T>)
+ *   mcpx::settlement::claim_for_failed_call<T>(receipt: &mut CallReceipt,
+ *       pool: &mut InsurancePool<T>, clock, ctx) -> u64
+ *
+ * Staking SLA tiers map to `sla_uptime_x100`: 95% → 9500, 99% → 9900,
+ * 99.9% → 9990. All client/dev-signed except `slash`, which is signed by the
+ * quality-oracle's OracleCap holder.
+ */
+
+/** SLA tier → uptime ×100 the staking contract stores. */
+export const SLA_TIER_UPTIME_X100 = { '95': 9500, '99': 9900, '99.9': 9990 } as const;
+export type SlaTier = keyof typeof SLA_TIER_UPTIME_X100;
+
+export async function buildPostStakeTx(args: {
+  cfg: SuiTxConfig;
+  /** Shared PlatformConfig object id. */
+  platformConfigId: string;
+  sender: string;
+  serverObjectId: string;
+  stakeAtomic: bigint;
+  slaTier: SlaTier;
+  slaWindowSeconds: number;
+  lockDurationMs: number;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const coin = await coinInput(
+    tx,
+    client,
+    args.sender,
+    args.cfg.coinType,
+    args.stakeAtomic,
+  );
+  tx.moveCall({
+    target: `${args.cfg.packageId}::staking::post`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [
+      tx.object(args.platformConfigId),
+      tx.pure.address(args.serverObjectId), // ID is BCS-identical to address
+      coin,
+      tx.pure.u32(SLA_TIER_UPTIME_X100[args.slaTier]),
+      tx.pure.u64(BigInt(args.slaWindowSeconds)),
+      tx.pure.u64(BigInt(args.lockDurationMs)),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+export async function buildTopUpStakeTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  stakeObjectId: string;
+  amountAtomic: bigint;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const coin = await coinInput(
+    tx,
+    client,
+    args.sender,
+    args.cfg.coinType,
+    args.amountAtomic,
+  );
+  tx.moveCall({
+    target: `${args.cfg.packageId}::staking::top_up`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [tx.object(args.stakeObjectId), coin],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+export async function buildWithdrawStakeTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  stakeObjectId: string;
+  amountAtomic: bigint;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  tx.moveCall({
+    target: `${args.cfg.packageId}::staking::withdraw`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [
+      tx.object(args.stakeObjectId),
+      tx.pure.u64(args.amountAtomic),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/**
+ * Oracle-signed slash PTB. Built by the quality-oracle service; the OracleCap
+ * is an owned object held by the oracle's signing address.
+ */
+export async function buildSlashStakeTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  /** Owned OracleCap object id held by `sender`. */
+  oracleCapId: string;
+  stakeObjectId: string;
+  insurancePoolId: string;
+  amountAtomic: bigint;
+  reason: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const enc = (s: string) => Array.from(new TextEncoder().encode(s));
+  tx.moveCall({
+    target: `${args.cfg.packageId}::staking::slash`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [
+      tx.object(args.oracleCapId),
+      tx.object(args.stakeObjectId),
+      tx.object(args.insurancePoolId),
+      tx.pure.u64(args.amountAtomic),
+      tx.pure.vector('u8', enc(args.reason)),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/** Permissionless, user-signed: reclaim a failed call's cost from insurance. */
+export async function buildClaimFailedCallTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  /** Soulbound CallReceipt object id owned by `sender` (the payer). */
+  receiptObjectId: string;
+  insurancePoolId: string;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  tx.moveCall({
+    target: `${args.cfg.packageId}::settlement::claim_for_failed_call`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [
+      tx.object(args.receiptObjectId),
+      tx.object(args.insurancePoolId),
+      tx.object('0x6'), // Clock
+    ],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}
+
+/** Sponsor donation top-up of the insurance pool. */
+export async function buildTopUpInsuranceTx(args: {
+  cfg: SuiTxConfig;
+  sender: string;
+  insurancePoolId: string;
+  amountAtomic: bigint;
+}): Promise<BuiltTx> {
+  const { Transaction, SuiClient } = await sui();
+  const client = new SuiClient({ url: args.cfg.rpcUrl });
+  const tx = new Transaction();
+  tx.setSender(args.sender);
+  const coin = await coinInput(
+    tx,
+    client,
+    args.sender,
+    args.cfg.coinType,
+    args.amountAtomic,
+  );
+  tx.moveCall({
+    target: `${args.cfg.packageId}::insurance::top_up`,
+    typeArguments: [args.cfg.coinType],
+    arguments: [tx.object(args.insurancePoolId), coin],
+  });
+  const txBytes = await tx.build({ client });
+  return { txBytesB64: Buffer.from(txBytes).toString('base64') };
+}

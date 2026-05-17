@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { listMarketplaceServers, listCurrentFeatured } from "@/lib/chain/reads";
+import {
+  listMarketplaceServers,
+  listCurrentFeatured,
+  listStakedServerIds,
+} from "@/lib/chain/reads";
 import { MarketplaceClient } from "./marketplace-client";
 
 const categories = [
@@ -22,12 +26,25 @@ export const metadata = {
 export default async function MarketplacePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    sort?: string;
+    staked?: string;
+  }>;
 }) {
   const params = await searchParams;
 
   // S4-T12: read the indexer mirror (marketplace_servers view), not chain RPC.
   const all = await listMarketplaceServers();
+  // S7-T12: serverObjectIds that currently have a funded stake.
+  let stakedIds = new Set<string>();
+  try {
+    stakedIds = await listStakedServerIds();
+  } catch {
+    stakedIds = new Set();
+  }
+  const stakedOnly = params.staked === "1";
   // S6-T25: app-owned featured rotation (read-only here).
   let featuredIds: string[] = [];
   try {
@@ -40,6 +57,9 @@ export default async function MarketplacePage({
   }
   const q = params.q?.toLowerCase();
   const filtered = all.filter((s) => {
+    if (stakedOnly && !stakedIds.has(s.objectId)) {
+      return false;
+    }
     if (
       params.category &&
       params.category !== "All" &&
@@ -82,6 +102,7 @@ export default async function MarketplacePage({
     created_at: "",
     quality_score_x100: s.qualityScoreX100,
     featured: featuredRank.has(s.objectId),
+    staked: stakedIds.has(s.objectId),
   }));
 
   return (
@@ -146,6 +167,7 @@ export default async function MarketplacePage({
           initialQuery={params.q || ""}
           initialCategory={params.category || "All"}
           initialSort={params.sort || "popular"}
+          initialStakedOnly={stakedOnly}
         />
       </div>
     </div>

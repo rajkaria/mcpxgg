@@ -82,13 +82,25 @@ export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InM
       if (!session) {
         throw new ChainError('execution_failed', 'session not found at submit time');
       }
+      // Upto scheme: only the metered actual is debited; the contract rejects
+      // actual > quoted_max, so mirror that here.
+      const isUpto = params.uptoActualAtomic !== undefined;
+      const debit = isUpto
+        ? (params.uptoActualAtomic as bigint)
+        : params.amountAtomic;
+      if (isUpto && debit > params.amountAtomic) {
+        throw new ChainError(
+          'execution_failed',
+          `upto actual ${debit} exceeds quoted max ${params.amountAtomic}`,
+        );
+      }
       // Mirror chain debit semantics.
       const today = backend.todayEpochDay();
       const isNewDay = session.todayEpochDay !== today;
-      const newToday = isNewDay ? params.amountAtomic : session.todaySpentAtomic + params.amountAtomic;
+      const newToday = isNewDay ? debit : session.todaySpentAtomic + debit;
       const updated: SessionView = {
         ...session,
-        balanceAtomic: session.balanceAtomic - params.amountAtomic,
+        balanceAtomic: session.balanceAtomic - debit,
         todaySpentAtomic: newToday,
         todayEpochDay: today,
       };
@@ -97,7 +109,12 @@ export function createInMemorySuiBackend(opts: InMemoryBackendOptions = {}): InM
       const result: SettleSubmitResult = {
         txDigest: `0xtx${settleCounter.toString(16).padStart(8, '0')}`,
         receiptObjectId: `0xrcpt${settleCounter.toString(16).padStart(8, '0')}`,
-        settledAmountAtomic: params.amountAtomic,
+        settledAmountAtomic: debit,
+        ...(isUpto && {
+          quotedMaxAtomic: params.amountAtomic,
+          unusedAtomic:
+            params.amountAtomic > debit ? params.amountAtomic - debit : 0n,
+        }),
       };
       submitted.push(result);
       return result;

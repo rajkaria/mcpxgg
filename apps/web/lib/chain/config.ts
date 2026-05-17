@@ -36,3 +36,17 @@ export function usdToUsdsuiAtomic(usd: number): bigint {
   if (!Number.isFinite(usd) || usd <= 0) throw new Error("amount must be > 0");
   return BigInt(Math.round(usd * 1_000_000));
 }
+
+/**
+ * Shared PlatformConfig object id (S7-T10: `staking::post` argument). Same env
+ * name the facilitator uses (MCPX_PLATFORM_CONFIG_ID) so a deploy sets it once.
+ */
+export function platformConfigId(): string {
+  const id = process.env.MCPX_PLATFORM_CONFIG_ID;
+  if (!id) {
+    throw new Error(
+      "Sui not configured: set MCPX_PLATFORM_CONFIG_ID (after S1-T17 deploy)",
+    );
+  }
+  return id;
+}

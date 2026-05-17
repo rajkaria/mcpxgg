@@ -6,19 +6,25 @@
  * endpoints exist separately in x402.
  */
 
-import type { SettleErrorCode, SettleResult } from '@mcpxgg/x402';
+import type { SettleErrorCode, SettleResult, UptoSettleExtra } from '@mcpxgg/x402';
 import { parsePaymentPayloadWire } from '@mcpxgg/x402';
 import type { SuiBackend } from './sui/backend.js';
 import { ChainError } from './sui/types.js';
 import type { FacilitatorEnv } from './env.js';
 import { GasStation, rateLimitedChainError } from './gas-station.js';
 import { verifyPayment, type VerifyInput } from './verify.js';
+import { pickScheme, SchemeError } from './schemes/scheme.js';
 
 export interface SettleInput extends VerifyInput {
   /** Optional Walrus blob id where the caller archived the request/response. */
   receiptBlobId?: string;
   /** Whether the underlying server call succeeded. Default true. */
   success?: boolean;
+  /**
+   * `upto`-scheme settle-time supplement: the metered amount to actually
+   * debit (≤ the signed ceiling). Ignored for the `exact` scheme.
+   */
+  uptoExtra?: UptoSettleExtra | undefined;
 }
 
 export async function settlePayment(
@@ -53,26 +59,38 @@ export async function settlePayment(
     typeof payload.details.metadata?.intentCategory === 'string'
       ? (payload.details.metadata.intentCategory as string)
       : '';
+
+  const handler = pickScheme(payload.details.scheme);
+  let submitParams;
   try {
-    const result = await backend.submitSettle({
-      payerAddress: payload.payerAddress,
-      sessionObjectId: payload.sessionObjectId,
-      serverObjectId: payload.details.serverObjectId,
-      toolName: payload.details.toolName,
-      amountAtomic: BigInt(payload.details.amountAtomic),
-      ...(payload.intentId !== undefined && {
-        intentId: payload.intentId,
-        category: intentCategory,
-      }),
+    submitParams = handler.build({
+      payload,
+      intentCategory,
       logBlobId: input.receiptBlobId ?? '',
       success: input.success ?? true,
+      uptoExtra: input.uptoExtra,
     });
+  } catch (e) {
+    if (e instanceof SchemeError) {
+      return { success: false, errorCode: 'verify_failed', errorMessage: e.message };
+    }
+    throw e;
+  }
+
+  try {
+    const result = await backend.submitSettle(submitParams);
     gasStation.record(0n); // gas cost tracked separately; record the request slot
     return {
       success: true,
       txDigest: result.txDigest,
       receiptObjectId: result.receiptObjectId,
       settledAmountAtomic: result.settledAmountAtomic,
+      ...(result.quotedMaxAtomic !== undefined && {
+        quotedMaxAtomic: result.quotedMaxAtomic,
+      }),
+      ...(result.unusedAtomic !== undefined && {
+        unusedAtomic: result.unusedAtomic,
+      }),
       ...(input.receiptBlobId !== undefined && { receiptBlobId: input.receiptBlobId }),
     };
   } catch (e) {

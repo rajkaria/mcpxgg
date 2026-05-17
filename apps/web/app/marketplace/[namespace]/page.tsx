@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getActiveChain } from "@mcpxgg/chain";
 import { createClient } from "@/lib/supabase/server";
-import { getMarketplaceServer, usdsui } from "@/lib/chain/reads";
+import { getMarketplaceServer, getServerStake, usdsui } from "@/lib/chain/reads";
 import { QualityBadge } from "@/components/QualityBadge";
+import { StakeBadge } from "@/components/StakeBadge";
 import { DemoCallButton } from "@/components/DemoCallButton";
 import { ServerDetailClient } from "./server-detail-client";
 
@@ -55,6 +56,8 @@ export default async function ServerDetailPage({
   // S4-T13: chain-mirror facts (object id, README blob, settle digest).
   const view = await getMarketplaceServer(namespace);
   const chain = getActiveChain();
+  // S7-T11: SLA stake (indexer `stakes` mirror) for the trust badge.
+  const stake = view ? await getServerStake(view.objectId).catch(() => null) : null;
 
   // Fetch tools for this server
   const { data: tools } = await supabase
@@ -151,6 +154,11 @@ export default async function ServerDetailPage({
                 </span>
               )}
               <QualityBadge scoreX100={view?.qualityScoreX100} size="md" />
+              <StakeBadge
+                remainingAtomic={stake ? stake.remainingAtomic : null}
+                slaUptimeX100={stake ? stake.slaUptimeX100 : null}
+                size="md"
+              />
             </div>
             <p
               className="text-sm font-mono mb-3"

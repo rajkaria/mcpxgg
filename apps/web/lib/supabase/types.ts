@@ -496,6 +496,31 @@ export interface Database {
         };
         Relationships: [];
       };
+      stakes: {
+        Row: {
+          stake_object_id: string;
+          chain_id: string;
+          server_object_id: string;
+          owner_address: string;
+          amount_atomic: number | string;
+          sla_uptime_x100: number;
+          tx_digest: string;
+          created_at: string | null;
+        };
+        Relationships: [];
+      };
+      stake_slashes: {
+        Row: {
+          id: number;
+          stake_object_id: string;
+          server_object_id: string;
+          amount_atomic: number | string;
+          reason: string;
+          slashed_at: string;
+          tx_digest: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: Record<string, never>;
     Enums: Record<string, never>;

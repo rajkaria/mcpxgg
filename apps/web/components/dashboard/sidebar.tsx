@@ -11,6 +11,7 @@ const navItems = [
   { label: "Connected MCPs", href: "/dashboard/servers", icon: "plug" },
   { label: "Usage", href: "/dashboard/usage", icon: "store" },
   { label: "Spending Intents", href: "/dashboard/intents", icon: "key" },
+  { label: "SLA Staking", href: "/dashboard/staking", icon: "store" },
   { label: "Billing", href: "/dashboard/billing", icon: "credit-card" },
   { label: "Settings", href: "/dashboard/settings", icon: "settings" },
   { label: "API Key", href: "/dashboard/settings/api-key", icon: "key" },

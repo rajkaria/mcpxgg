@@ -51,6 +51,22 @@ public(package) fun collect<T>(pool: &mut InsurancePool<T>, fee: Balance<T>) {
     events::emit_insurance_collected(amount, pool.lifetime_collected_atomic);
 }
 
+/// Internal: pay a verified failed-call claim. Called only by
+/// `settlement::claim_for_failed_call`, which proves the claim is backed by a
+/// soulbound `CallReceipt` with `success == false` and `refunded == false`.
+/// `amount` is pre-capped by the caller to the pool balance.
+public(package) fun pay_claim<T>(
+    pool: &mut InsurancePool<T>,
+    amount: u64,
+    recipient: address,
+    ctx: &mut TxContext,
+) {
+    assert!(balance::value(&pool.balance) >= amount, E_INSUFFICIENT_BALANCE);
+    let payment = coin::from_balance(balance::split(&mut pool.balance, amount), ctx);
+    pool.lifetime_paid_atomic = pool.lifetime_paid_atomic + amount;
+    transfer::public_transfer(payment, recipient);
+}
+
 /// Manual top-up — anyone can donate.
 public fun top_up<T>(pool: &mut InsurancePool<T>, contribution: Coin<T>) {
     let amount = coin::value(&contribution);

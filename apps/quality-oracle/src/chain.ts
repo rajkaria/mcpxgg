@@ -11,17 +11,30 @@
 
 import {
   buildAttestQualityTx,
+  buildSlashStakeTx,
   signAndExecuteBase64Tx,
   addressFromPrivateKey,
   getActiveChain,
 } from '@mcpxgg/chain';
-import type { AttestInput, QualityChainClient } from './oracle.js';
+import type {
+  AttestInput,
+  QualityChainClient,
+  SlashChainClient,
+  SlashInput,
+} from './oracle.js';
 
 export interface ChainClientConfig {
   packageId: string;
   rpcUrl: string;
   oracleCapId: string;
   oraclePrivateKey: string;
+}
+
+export interface SlashChainConfig extends ChainClientConfig {
+  /** USDsui coin type tag — the `slash<T>` type argument. */
+  coinType: string;
+  /** Shared InsurancePool object id slashed funds route to. */
+  insurancePoolId: string;
 }
 
 export async function createChainClient(cfg: ChainClientConfig): Promise<QualityChainClient> {
@@ -44,6 +57,46 @@ export async function createChainClient(cfg: ChainClientConfig): Promise<Quality
         sampleCount: input.sampleCount,
         windowStartMs: input.windowStartMs,
         windowEndMs: input.windowEndMs,
+      });
+      const res = await signAndExecuteBase64Tx({
+        txBytesB64: built.txBytesB64,
+        privateKey: cfg.oraclePrivateKey,
+        rpcUrl: cfg.rpcUrl,
+      });
+      return { digest: res.digest };
+    },
+  };
+}
+
+/**
+ * Production SlashChainClient (S7-T09). Builds the `mcpx::staking::slash` PTB
+ * via @mcpxgg/chain `buildSlashStakeTx` and signs+submits it through
+ * `signAndExecuteBase64Tx` with the oracle's key — the *exact* signer/cap path
+ * `createChainClient`/attest uses. The OracleCap is an owned object held by
+ * the oracle address; slashed USDsui routes on-chain to the InsurancePool.
+ */
+export async function createSlashChainClient(
+  cfg: SlashChainConfig,
+): Promise<SlashChainClient> {
+  getActiveChain();
+  const sender = await addressFromPrivateKey(cfg.oraclePrivateKey);
+
+  return {
+    async slash(input: SlashInput): Promise<{ digest: string }> {
+      const built = await buildSlashStakeTx({
+        cfg: {
+          packageId: cfg.packageId,
+          rpcUrl: cfg.rpcUrl,
+          coinType: cfg.coinType,
+          // sessionRegistryId is unused by slash; satisfy the type.
+          sessionRegistryId: '0x0',
+        },
+        sender,
+        oracleCapId: cfg.oracleCapId,
+        stakeObjectId: input.stakeObjectId,
+        insurancePoolId: cfg.insurancePoolId,
+        amountAtomic: input.amountAtomic,
+        reason: input.reason,
       });
       const res = await signAndExecuteBase64Tx({
         txBytesB64: built.txBytesB64,

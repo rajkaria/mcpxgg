@@ -21,6 +21,8 @@ import type {
   ToolContext,
   ToolDefinition,
   ToolResult,
+  ToolStream,
+  ToolStreamChunk,
 } from './types.js';
 
 export const SDK_VERSION = '0.2.0';
@@ -56,6 +58,22 @@ function normalizeResult(r: ToolResult): {
     content: [{ type: 'text', text: JSON.stringify(r) }],
     isError: false,
   };
+}
+
+function isAsyncIterable(v: unknown): v is ToolStream {
+  return (
+    v != null &&
+    typeof (v as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] ===
+      'function'
+  );
+}
+
+function chunkToSseData(c: ToolStreamChunk): string {
+  return JSON.stringify({
+    text: c.text,
+    ...(c.priceAtomic !== undefined && { priceAtomic: c.priceAtomic.toString() }),
+    ...(c.meta !== undefined && { meta: c.meta }),
+  });
 }
 
 function ctxFromHeaders(h: Headers): ToolContext {
@@ -132,12 +150,18 @@ export function createMCPXServer(opts: MCPXServerOptions): MCPXServer {
 
         const ctx = ctxFromHeaders(c.req.raw.headers);
         const timeoutMs = (def.timeoutSeconds ?? 30) * 1000;
+        const wantsStream = (c.req.header('accept') ?? '')
+          .toLowerCase()
+          .includes('text/event-stream');
+        let handlerOut: ToolResult | ToolStream;
         try {
-          const result = await withTimeout(
+          // The handler call itself is timed; an async iterator resolves
+          // immediately (the time is spent draining it, bounded per-chunk
+          // by the consumer / gateway, not here).
+          handlerOut = await withTimeout(
             Promise.resolve(def.handler(args, ctx)),
             timeoutMs,
           );
-          return c.json(rpcResult(id, normalizeResult(result)));
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return c.json(
@@ -147,6 +171,77 @@ export function createMCPXServer(opts: MCPXServerOptions): MCPXServer {
             }),
           );
         }
+
+        if (isAsyncIterable(handlerOut)) {
+          const stream = handlerOut;
+          if (wantsStream) {
+            // SSE: one `chunk` event per yielded unit so the gateway meters
+            // per-output, then a terminal `done` event. Client/gateway abort
+            // (request signal) stops iteration — finalize-on-close is the
+            // gateway's job (S7-T04).
+            const encoder = new TextEncoder();
+            const body = new ReadableStream<Uint8Array>({
+              async start(controller) {
+                try {
+                  for await (const chunk of stream) {
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: chunk\ndata: ${chunkToSseData(chunk)}\n\n`,
+                      ),
+                    );
+                  }
+                  controller.enqueue(
+                    encoder.encode(`event: done\ndata: {}\n\n`),
+                  );
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  controller.enqueue(
+                    encoder.encode(
+                      `event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`,
+                    ),
+                  );
+                } finally {
+                  controller.close();
+                }
+              },
+            });
+            return new Response(body, {
+              headers: {
+                'content-type': 'text/event-stream',
+                'cache-control': 'no-cache',
+                connection: 'keep-alive',
+                'x-mcpx-stream': '1',
+              },
+            });
+          }
+          // Non-SSE caller but streaming handler: drain + concatenate so
+          // legacy callers still get a single JSON-RPC result (backward
+          // compatible). Whole drain is bounded by the handler timeout.
+          try {
+            const drain = (async () => {
+              const parts: string[] = [];
+              for await (const ch of stream) parts.push(ch.text);
+              return parts;
+            })();
+            const parts = await withTimeout(drain, timeoutMs);
+            return c.json(
+              rpcResult(id, {
+                content: parts.map((text) => ({ type: 'text', text })),
+                isError: false,
+              }),
+            );
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            return c.json(
+              rpcResult(id, {
+                content: [{ type: 'text', text: `Tool error: ${msg}` }],
+                isError: true,
+              }),
+            );
+          }
+        }
+
+        return c.json(rpcResult(id, normalizeResult(handlerOut)));
       }
       default:
         return c.json(rpcError(id, -32601, `Method not found: ${body.method}`), 404);

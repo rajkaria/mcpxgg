@@ -28,10 +28,32 @@ export type ToolResult =
   | Record<string, unknown>
   | { content: Array<{ type: string; text?: string; [k: string]: unknown }>; isError?: boolean };
 
+/**
+ * One streamed unit of work. Each chunk is metered independently by the
+ * gateway (S7-T04, pay-per-output). `text` is the payload; `priceAtomic`,
+ * when set, overrides the tool's per-call price for *this chunk* (USDsui
+ * 6-decimal atomic units). Omit it to charge the tool's per-call price
+ * once per chunk.
+ */
+export interface ToolStreamChunk {
+  text: string;
+  /** Per-chunk price override in USDsui atomic units. */
+  priceAtomic?: bigint;
+  /** Optional structured metadata echoed back to the caller. */
+  meta?: Record<string, unknown>;
+}
+
+/**
+ * A streaming handler return. The SDK wraps each yielded chunk so the
+ * gateway can meter per-output. Backward compatible: a handler may still
+ * return a single `ToolResult` (non-iterable) and nothing changes.
+ */
+export type ToolStream = AsyncIterable<ToolStreamChunk>;
+
 export type ToolHandler = (
   args: Record<string, unknown>,
   ctx: ToolContext,
-) => Promise<ToolResult> | ToolResult;
+) => Promise<ToolResult> | ToolResult | ToolStream;
 
 export interface ToolDefinition {
   description: string;

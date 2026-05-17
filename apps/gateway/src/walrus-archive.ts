@@ -19,6 +19,8 @@ export interface ArchiveEnvelope {
   ts: number;
   request: { arguments: Record<string, unknown> };
   response: { content: unknown; isError: boolean };
+  /** Pay-per-output streaming summary (S7-T04). Absent for unary calls. */
+  stream?: { chunks: number; metered_atomic: string };
 }
 
 export async function archiveCall(

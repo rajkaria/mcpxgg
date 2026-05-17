@@ -9,7 +9,12 @@
  * (tests use the in-memory facilitator's `valid:<addr>` convention).
  */
 
-import type { PaymentDetails, PaymentPayload, SettleResult } from '@mcpxgg/x402';
+import type {
+  PaymentDetails,
+  PaymentPayload,
+  SettleResult,
+  UptoSettleExtra,
+} from '@mcpxgg/x402';
 import { FacilitatorClient } from '@mcpxgg/x402';
 import type { GatewayEnv } from './env.js';
 import type { AuthContext, ResolvedServer, ResolvedTool } from './store/store.js';
@@ -30,7 +35,17 @@ export interface SettleArgs {
   auth: AuthContext;
   server: ResolvedServer;
   tool: ResolvedTool;
+  /**
+   * `exact`: the amount to debit (== signed amount).
+   * `upto`: the quoted ceiling the buyer signs. The metered actual is in
+   * `uptoActualAtomic`. The facilitator/contract debit only the actual and
+   * never move the unused delta (implicit refund).
+   */
   chargeAtomic: bigint;
+  /** When set, settle via the `upto` scheme. */
+  scheme?: 'exact' | 'upto';
+  /** `upto` only: metered sum to actually debit (≤ chargeAtomic). */
+  uptoActualAtomic?: bigint;
   success: boolean;
   receiptBlobId?: string;
   /**
@@ -54,7 +69,7 @@ export function buildPayment(
   a: SettleArgs,
 ): { details: PaymentDetails; canonical: string } {
   const details: PaymentDetails = {
-    scheme: 'exact',
+    scheme: a.scheme ?? 'exact',
     network: env.network,
     serverObjectId: a.server.serverObjectId,
     toolName: a.tool.toolName,
@@ -97,8 +112,13 @@ export async function settle(
     details,
   };
 
+  const uptoExtra: UptoSettleExtra | undefined =
+    (a.scheme ?? 'exact') === 'upto'
+      ? { actualAtomic: a.uptoActualAtomic ?? 0n }
+      : undefined;
+
   const attempt = async (): Promise<SettleResult> =>
-    client.settle(payload, details);
+    client.settle(payload, details, uptoExtra);
 
   try {
     const r = await attempt();

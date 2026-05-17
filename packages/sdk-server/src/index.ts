@@ -25,6 +25,8 @@ export type {
   ToolContext,
   ToolPricing,
   ToolResult,
+  ToolStream,
+  ToolStreamChunk,
   RegisteredTool,
   ServerManifest,
 } from './types.js';

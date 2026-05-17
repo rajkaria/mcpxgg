@@ -130,7 +130,50 @@ export async function createRealSuiBackend(env: FacilitatorEnv): Promise<SuiBack
       tx.setSender(gasStationKeypair.toSuiAddress());
       const enc = (s: string) =>
         Array.from(new TextEncoder().encode(s));
-      if (params.intentId !== undefined) {
+      const isUpto = params.uptoActualAtomic !== undefined;
+      if (isUpto && params.intentId !== undefined) {
+        // Upto + intent (S7-T02). Buyer signed a ceiling (amountAtomic =
+        // quoted max); only the metered actual is debited. The contract
+        // enforces actual ≤ quoted_max and never moves the unused delta.
+        tx.moveCall({
+          target: `${env.mcpxPackageId}::settlement::settle_call_upto_with_intent`,
+          typeArguments: [env.usdsuiTypeTag],
+          arguments: [
+            tx.object(params.sessionObjectId),
+            tx.object(params.serverObjectId),
+            tx.object(env.platformConfigId),
+            tx.object(env.treasuryId),
+            tx.object(env.insuranceId),
+            tx.object(params.intentId),
+            tx.pure.string(params.toolName),
+            tx.pure.vector('u8', enc(params.category ?? '')),
+            tx.pure.u64(params.amountAtomic),
+            tx.pure.u64(params.uptoActualAtomic ?? 0n),
+            tx.pure.vector('u8', enc(params.logBlobId)),
+            tx.pure.bool(params.success),
+            tx.object('0x6'), // Clock
+          ],
+        });
+      } else if (isUpto) {
+        // Upto, no intent (S7-T02).
+        tx.moveCall({
+          target: `${env.mcpxPackageId}::settlement::settle_call_upto`,
+          typeArguments: [env.usdsuiTypeTag],
+          arguments: [
+            tx.object(params.sessionObjectId),
+            tx.object(params.serverObjectId),
+            tx.object(env.platformConfigId),
+            tx.object(env.treasuryId),
+            tx.object(env.insuranceId),
+            tx.pure.string(params.toolName),
+            tx.pure.u64(params.amountAtomic),
+            tx.pure.u64(params.uptoActualAtomic ?? 0n),
+            tx.pure.vector('u8', enc(params.logBlobId)),
+            tx.pure.bool(params.success),
+            tx.object('0x6'), // Clock
+          ],
+        });
+      } else if (params.intentId !== undefined) {
         // Intent-aware path (S6-T06). Same money movement as settle_call plus
         // post-receipt intent policy/counter enforcement on chain.
         tx.moveCall({
@@ -188,6 +231,17 @@ export async function createRealSuiBackend(env: FacilitatorEnv): Promise<SuiBack
         );
         if (!receipt) {
           throw new ChainError('execution_failed', 'CallReceipt object not minted');
+        }
+        if (params.uptoActualAtomic !== undefined) {
+          const actual = params.uptoActualAtomic;
+          return {
+            txDigest: result.digest,
+            receiptObjectId: receipt.objectId,
+            settledAmountAtomic: actual,
+            quotedMaxAtomic: params.amountAtomic,
+            unusedAtomic:
+              params.amountAtomic > actual ? params.amountAtomic - actual : 0n,
+          };
         }
         return {
           txDigest: result.digest,

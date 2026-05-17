@@ -524,3 +524,324 @@ fun settle_with_intent_agent_payer_mismatch_aborts() {
     session::destroy_for_testing(session);
     sc.end();
 }
+
+// ─── Pay-per-output / upto (S7-T03) ─────────────────────────────────────────
+
+#[test]
+fun settle_upto_meters_actual_not_quoted() {
+    // Quoted ceiling 10_000, actual metered 3_000. Only 3_000 is debited;
+    // split applies to actual: insurance=15, treasury=60, dev=2_925.
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"stream", b"d", b"s", 1_000, 0, 30, &clk);
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(50_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    let receipt_id = settlement::settle_call_upto<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 10_000, 3_000, b"stream", b"log", true, &clk, sc.ctx(),
+    );
+
+    assert!(treasury::balance_value(&treasury_obj) == 60, 0);
+    assert!(insurance::balance_value(&insurance_obj) == 15, 1);
+    assert!(vault::accrued_balance(&vault_obj) == 2_925, 2);
+    assert!(session::balance_value(&session) == 47_000, 3);
+
+    sc.next_tx(USER);
+    {
+        let r = sc.take_from_address<CallReceipt>(USER);
+        assert!(object::id(&r) == receipt_id, 4);
+        assert!(settlement::receipt_amount(&r) == 3_000, 5);
+        settlement::destroy_receipt_for_testing(r);
+    };
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::settlement::E_ACTUAL_EXCEEDS_QUOTED)]
+fun settle_upto_actual_exceeds_quoted_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"stream", b"d", b"s", 1_000, 0, 30, &clk);
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(50_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    settlement::settle_call_upto<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 5_000, 9_000, b"stream", b"log", true, &clk, sc.ctx(),
+    );
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+// ─── Insurance claim for failed call (S7-T14) ───────────────────────────────
+
+#[test]
+fun claim_for_failed_call_refunds_payer_from_pool() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+
+    // Pre-fund the insurance pool so it can cover the claim.
+    insurance::collect_for_testing(&mut insurance_obj, balance::create_for_testing<SUI>(100_000));
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(50_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    // A failed call (success = false).
+    settlement::settle_call<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 10_000, b"query", b"log", false, &clk, sc.ctx(),
+    );
+
+    let pool_before = insurance::balance_value(&insurance_obj);
+
+    sc.next_tx(USER);
+    {
+        let mut r = sc.take_from_address<CallReceipt>(USER);
+        let paid = settlement::claim_for_failed_call<SUI>(
+            &mut r, &mut insurance_obj, &clk, sc.ctx(),
+        );
+        assert!(paid == 10_000, 0);
+        assert!(settlement::receipt_refunded(&r), 1);
+        settlement::destroy_receipt_for_testing(r);
+    };
+
+    assert!(insurance::balance_value(&insurance_obj) == pool_before - 10_000, 2);
+
+    sc.next_tx(USER);
+    {
+        let refund = sc.take_from_address<sui::coin::Coin<SUI>>(USER);
+        assert!(sui::coin::value(&refund) == 10_000, 3);
+        sui::coin::burn_for_testing(refund);
+    };
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::settlement::E_RECEIPT_SUCCEEDED)]
+fun claim_on_successful_call_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+    insurance::collect_for_testing(&mut insurance_obj, balance::create_for_testing<SUI>(100_000));
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(50_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+    settlement::settle_call<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 10_000, b"query", b"log", true, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(USER);
+    let mut r = sc.take_from_address<CallReceipt>(USER);
+    settlement::claim_for_failed_call<SUI>(&mut r, &mut insurance_obj, &clk, sc.ctx());
+    settlement::destroy_receipt_for_testing(r);
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+#[test]
+#[expected_failure(abort_code = mcpx::settlement::E_ALREADY_REFUNDED)]
+fun claim_twice_aborts() {
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+    insurance::collect_for_testing(&mut insurance_obj, balance::create_for_testing<SUI>(100_000));
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(50_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+    settlement::settle_call<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 10_000, b"query", b"log", false, &clk, sc.ctx(),
+    );
+
+    sc.next_tx(USER);
+    let mut r = sc.take_from_address<CallReceipt>(USER);
+    settlement::claim_for_failed_call<SUI>(&mut r, &mut insurance_obj, &clk, sc.ctx());
+    // second claim aborts
+    settlement::claim_for_failed_call<SUI>(&mut r, &mut insurance_obj, &clk, sc.ctx());
+    settlement::destroy_receipt_for_testing(r);
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}
+
+// ─── Take-rate split correctness (S7-T17) ───────────────────────────────────
+
+#[test]
+fun take_rate_split_is_50bps_insurance_200bps_treasury() {
+    // Explicit ADR-004 assertion: of 250bps total take, exactly 50bps routes
+    // to insurance and 200bps to treasury; remainder to the dev vault.
+    let mut sc = ts::begin(DEV);
+    let clk = clock::create_for_testing(sc.ctx());
+
+    let admin_cap = admin::mint_admin_cap_for_testing(sc.ctx());
+    let config = admin::new_config_for_testing(sc.ctx());
+    let mut treasury_obj = treasury::new_for_testing<SUI>(sc.ctx());
+    let mut insurance_obj = insurance::new_for_testing<SUI>(sc.ctx());
+    let mut vault_obj = vault::new_for_testing<SUI>(DEV, sc.ctx());
+    let mut registry = registry::new_registry_for_testing(sc.ctx());
+    let cap = publish_test_server(&mut sc, &mut registry, &clk);
+
+    sc.next_tx(DEV);
+    let mut server = sc.take_shared<Server>();
+    registry::add_tool(&mut server, &cap, b"query", b"d", b"s", 1_000, 0, 30, &clk);
+
+    sc.next_tx(USER);
+    let mut session = session::new_for_testing<SUI>(
+        USER, balance::create_for_testing<SUI>(10_000_000), 0, 0, vector[], 0, &clk, sc.ctx(),
+    );
+
+    // 1_000_000 atomic → 50bps = 5_000 insurance, 200bps = 20_000 treasury,
+    // dev = 975_000. total take = 25_000 = 250bps.
+    settlement::settle_call<SUI>(
+        &config, &mut session, &server, &mut vault_obj, &mut treasury_obj,
+        &mut insurance_obj, 1_000_000, b"query", b"log", true, &clk, sc.ctx(),
+    );
+
+    let ins = insurance::balance_value(&insurance_obj);
+    let tre = treasury::balance_value(&treasury_obj);
+    let dev = vault::accrued_balance(&vault_obj);
+    assert!(ins == 5_000, 0);                 // 50bps
+    assert!(tre == 20_000, 1);                // 200bps
+    assert!(dev == 975_000, 2);               // remainder
+    assert!(ins + tre == 25_000, 3);          // 250bps total take
+    assert!(ins + tre + dev == 1_000_000, 4); // conservation
+
+    sc.next_tx(USER);
+    {
+        let r = sc.take_from_address<CallReceipt>(USER);
+        settlement::destroy_receipt_for_testing(r);
+    };
+
+    ts::return_shared(server);
+    clock::destroy_for_testing(clk);
+    admin::destroy_admin_cap_for_testing(admin_cap);
+    admin::destroy_config_for_testing(config);
+    treasury::destroy_for_testing(treasury_obj);
+    insurance::destroy_for_testing(insurance_obj);
+    vault::destroy_for_testing(vault_obj);
+    registry::destroy_cap_for_testing(cap);
+    registry::destroy_registry_for_testing(registry);
+    session::destroy_for_testing(session);
+    sc.end();
+}

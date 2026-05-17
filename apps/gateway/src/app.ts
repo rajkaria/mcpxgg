@@ -7,7 +7,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { extractApiKey, authenticate } from './auth.js';
-import { handleMcpRequest, type GatewayDeps } from './handler.js';
+import {
+  handleMcpRequest,
+  handleStreamingToolsCall,
+  type GatewayDeps,
+} from './handler.js';
 import { GatewayError } from './errors.js';
 
 export function createApp(deps: GatewayDeps): Hono {
@@ -44,10 +48,28 @@ export function createApp(deps: GatewayDeps): Hono {
 
     const intentId = c.req.header('x-mcpx-intent-id');
     const category = c.req.header('x-mcpx-category');
-    const res = await handleMcpRequest(body, auth, deps, {
+    const meta = {
       ...(intentId ? { intentId } : {}),
       ...(category ? { category } : {}),
-    });
+    };
+
+    // Pay-per-output streaming (S7-T04): a `tools/call` with
+    // `Accept: text/event-stream` streams chunks back over SSE and settles
+    // the metered actual via the facilitator `upto` path on stream close.
+    const wantsStream = (c.req.header('accept') ?? '')
+      .toLowerCase()
+      .includes('text/event-stream');
+    if (wantsStream && body.method === 'tools/call') {
+      return handleStreamingToolsCall(
+        (body.params as Record<string, unknown>) ?? {},
+        auth,
+        deps,
+        meta,
+        c.req.raw.signal,
+      );
+    }
+
+    const res = await handleMcpRequest(body, auth, deps, meta);
     return c.json(res);
   });
 

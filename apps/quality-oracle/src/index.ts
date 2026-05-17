@@ -18,25 +18,46 @@ import { Hono } from 'hono';
 import { initSentry } from '@mcpxgg/shared';
 import { loadEnv } from './env.js';
 import { createLogger, type Logger } from './logger.js';
-import { createSupabaseQualityStore } from './store.js';
-import { createChainClient } from './chain.js';
+import {
+  createSupabaseQualityStore,
+  createSupabaseStakeStore,
+  createSupabaseBreachStreakStore,
+} from './store.js';
+import { createChainClient, createSlashChainClient } from './chain.js';
 import {
   priorClosedWindow,
   runQualityOracle,
+  runSlaSlashing,
   WINDOW_MS,
+  type BreachStreakStore,
   type QualityChainClient,
   type QualityStore,
+  type SlashChainClient,
+  type StakeStore,
 } from './oracle.js';
 
-/** One closed-window pass. Exposed for tests / run-once. */
+export interface OracleDeps {
+  store: QualityStore;
+  chain: QualityChainClient;
+  /** S7-T09: SLA-staking slash deps. Omit to skip the slash pass. */
+  stakeStore?: StakeStore;
+  streakStore?: BreachStreakStore;
+  slashChain?: SlashChainClient;
+}
+
+/** One closed-window pass: quality attest, then SLA-stake slashing. */
 export async function runOnce(
-  store: QualityStore,
-  chain: QualityChainClient,
+  deps: OracleDeps,
   nowMs: number,
   logger: Logger,
 ): Promise<{ endMs: number }> {
   const { startMs, endMs } = priorClosedWindow(nowMs);
-  const res = await runQualityOracle(store, chain, startMs, endMs);
+
+  // Pull the window samples once and feed both passes (avoids a double scan).
+  const samples = await deps.store.getCallSamples(startMs, endMs);
+  const sampleStore: QualityStore = { getCallSamples: async () => samples };
+
+  const res = await runQualityOracle(sampleStore, deps.chain, startMs, endMs);
   logger.info(
     {
       window: [startMs, endMs],
@@ -44,11 +65,37 @@ export async function runOnce(
       attested: res.attestationsSubmitted,
       failures: res.failures.length,
     },
-    'quality-oracle: pass complete',
+    'quality-oracle: quality pass complete',
   );
   if (res.failures.length > 0) {
     logger.warn({ failures: res.failures }, 'quality-oracle: some attestations failed');
   }
+
+  if (deps.stakeStore && deps.streakStore && deps.slashChain) {
+    const slash = await runSlaSlashing(
+      deps.stakeStore,
+      deps.streakStore,
+      deps.slashChain,
+      samples,
+      startMs,
+      endMs,
+    );
+    logger.info(
+      {
+        window: [startMs, endMs],
+        stakes: slash.stakesEvaluated,
+        inBreach: slash.inBreach,
+        slashed: slash.slashesSubmitted,
+        slashedAtomic: slash.slashedAtomicTotal.toString(),
+        failures: slash.failures.length,
+      },
+      'quality-oracle: SLA-slash pass complete',
+    );
+    if (slash.failures.length > 0) {
+      logger.warn({ failures: slash.failures }, 'quality-oracle: some slashes failed');
+    }
+  }
+
   return { endMs };
 }
 
@@ -58,15 +105,14 @@ export async function runOnce(
  * null if the current window was already done.
  */
 export async function loopTick(
-  store: QualityStore,
-  chain: QualityChainClient,
+  deps: OracleDeps,
   lastAttestedBoundaryMs: number,
   nowMs: number,
   logger: Logger,
 ): Promise<{ attestedBoundaryMs: number } | null> {
   const { endMs } = priorClosedWindow(nowMs);
   if (endMs <= lastAttestedBoundaryMs) return null;
-  await runOnce(store, chain, nowMs, logger);
+  await runOnce(deps, nowMs, logger);
   return { attestedBoundaryMs: endMs };
 }
 
@@ -84,10 +130,27 @@ async function main(): Promise<void> {
     oracleCapId: env.oracleCapId,
     oraclePrivateKey: env.oraclePrivateKey,
   });
+  const stakeStore = await createSupabaseStakeStore(
+    env.supabaseUrl,
+    env.supabaseServiceRoleKey,
+  );
+  const streakStore = await createSupabaseBreachStreakStore(
+    env.supabaseUrl,
+    env.supabaseServiceRoleKey,
+  );
+  const slashChain = await createSlashChainClient({
+    packageId: env.mcpxPackageId,
+    rpcUrl: env.suiRpcUrl,
+    oracleCapId: env.oracleCapId,
+    oraclePrivateKey: env.oraclePrivateKey,
+    coinType: env.usdsuiCoinType,
+    insurancePoolId: env.insurancePoolId,
+  });
+  const deps: OracleDeps = { store, chain, stakeStore, streakStore, slashChain };
 
   const mode = process.argv[2];
   if (mode === 'run-once') {
-    await runOnce(store, chain, Date.now(), logger);
+    await runOnce(deps, Date.now(), logger);
     return;
   }
 
@@ -103,7 +166,7 @@ async function main(): Promise<void> {
   let lastBoundary = 0;
   while (!ac.signal.aborted) {
     try {
-      const r = await loopTick(store, chain, lastBoundary, Date.now(), logger);
+      const r = await loopTick(deps, lastBoundary, Date.now(), logger);
       if (r) lastBoundary = r.attestedBoundaryMs;
     } catch (e) {
       logger.error({ err: String(e) }, 'quality-oracle: tick failed; backing off');
